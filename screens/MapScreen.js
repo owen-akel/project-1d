@@ -169,6 +169,30 @@ export default function MapScreen() {
     }
   };
 
+  const handleZoomIn = () => {
+    const newRegion = {
+      ...region,
+      latitudeDelta: region.latitudeDelta * 0.5,
+      longitudeDelta: region.longitudeDelta * 0.5,
+    };
+    setRegion(newRegion);
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(newRegion, 300);
+    }
+  };
+
+  const handleZoomOut = () => {
+    const newRegion = {
+      ...region,
+      latitudeDelta: Math.min(region.latitudeDelta * 2, 180),
+      longitudeDelta: Math.min(region.longitudeDelta * 2, 360),
+    };
+    setRegion(newRegion);
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(newRegion, 300);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
       {/* Header */}
@@ -237,27 +261,36 @@ export default function MapScreen() {
           ))}
         </MapView>
 
-        {/* Location Button */}
-        <TouchableOpacity
-          style={[
-            styles.locationButton,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.cardBorder,
-              shadowColor: colors.shadow,
-            },
-            loading && styles.locationButtonDisabled,
-          ]}
-          onPress={handleCenterOnUser}
-          activeOpacity={0.7}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={[styles.locationButtonText, { color: colors.primary }]}>◎</Text>
-          )}
-        </TouchableOpacity>
+        {/* Zoom Controls */}
+        <View style={[styles.zoomControls, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <TouchableOpacity
+            style={[
+              styles.zoomButton,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={handleZoomIn}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.zoomButtonText, { color: colors.textPrimary }]}>+</Text>
+          </TouchableOpacity>
+          <View style={[styles.zoomDivider, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            style={[
+              styles.zoomButton,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={handleZoomOut}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.zoomButtonText, { color: colors.textPrimary }]}>−</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Legend */}
         <View style={[styles.legend, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -311,29 +344,36 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  locationButton: {
+  zoomControls: {
     position: 'absolute',
     right: 20,
-    bottom: 100,
+    top: 20,
     width: 50,
-    height: 50,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 1,
+    overflow: 'hidden',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
     zIndex: 3,
   },
-  locationButtonDisabled: {
-    opacity: 0.6,
+  zoomButton: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
-  locationButtonText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#14b8a6',
+  zoomDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  zoomButtonText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0f172a',
+    lineHeight: 28,
   },
   postsOverlay: {
     position: 'absolute',
