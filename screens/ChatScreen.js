@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   FlatList,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ChatScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const flatListRef = useRef(null);
 
   // Sample conversations - Instagram/iOS style
@@ -121,9 +123,9 @@ export default function ChatScreen() {
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Messages</Text>
         <TouchableOpacity
           style={styles.newMessageIcon}
-          onPress={() => console.log('New message')}
+          onPress={() => navigation.navigate('NewChat')}
         >
-          <Text style={[styles.newMessageIconText, { color: colors.primary }]}>✏️</Text>
+          <Text style={[styles.newMessageIconText, { color: colors.primary }]}>+</Text>
         </TouchableOpacity>
       </View>
 
@@ -166,7 +168,9 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   newMessageIconText: {
-    fontSize: 24,
+    fontSize: 32,
+    fontWeight: '300',
+    lineHeight: 32,
   },
   listContent: {
     paddingTop: 4,

@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ConnectionsEventsScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
 
   // Sample connections events feed
   const [events] = useState([
@@ -84,8 +86,16 @@ export default function ConnectionsEventsScreen() {
     <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Connections Events</Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Events from your connections</Text>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Connections Events</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Events from your connections</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.newEventButton}
+          onPress={() => navigation.navigate('CreateEvent')}
+        >
+          <Text style={[styles.newEventButtonText, { color: colors.primary }]}>+</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -123,12 +133,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 16,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+  },
+  newEventButton: {
+    padding: 4,
+  },
+  newEventButtonText: {
+    fontSize: 32,
+    fontWeight: '300',
+    lineHeight: 32,
+    color: '#14b8a6',
   },
   headerTitle: {
     fontSize: 28,

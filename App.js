@@ -9,12 +9,42 @@ import LaunchScreen from './screens/LaunchScreen';
 import AuthScreen from './screens/AuthScreen';
 import LocalEventsScreen from './screens/LocalEventsScreen';
 import ConnectionsEventsScreen from './screens/ConnectionsEventsScreen';
+import CreateEventScreen from './screens/CreateEventScreen';
 import MapScreen from './screens/MapScreen';
 import ChatScreen from './screens/ChatScreen';
+import NewChatScreen from './screens/NewChatScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+// Nested stack for Chat section
+function ChatStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="ChatList" component={ChatScreen} />
+      <Stack.Screen name="NewChat" component={NewChatScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Nested stack for Connections Events section
+function ConnectionsEventsStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="ConnectionsEventsList" component={ConnectionsEventsScreen} />
+      <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+    </Stack.Navigator>
+  );
+}
 
 function TabNavigator() {
   const { colors } = useTheme();
@@ -54,9 +84,9 @@ function TabNavigator() {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 90,
+          height: 100,
           paddingBottom: 30,
-          paddingTop: 10,
+          paddingTop: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -84,7 +114,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="ConnectionsEvents"
-        component={ConnectionsEventsScreen}
+        component={ConnectionsEventsStackNavigator}
         options={{
           tabBarLabel: 'Connections',
           tabBarIcon: ({ color, focused }) => (
@@ -106,7 +136,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Chat"
-        component={ChatScreen}
+        component={ChatStackNavigator}
         options={{
           tabBarLabel: 'Chat',
           tabBarIcon: ({ color, focused }) => (
@@ -164,21 +194,21 @@ export default function App() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 28,
-    height: 28,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoIconContainer: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
   },
   logoIcon: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
   },
   tabIcon: {
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
   },
 });
