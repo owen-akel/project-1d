@@ -5,6 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { FriendsProvider } from './context/FriendsContext';
+import { UserProvider } from './context/UserContext';
 import LaunchScreen from './screens/LaunchScreen';
 import AuthScreen from './screens/AuthScreen';
 import LocalEventsScreen from './screens/LocalEventsScreen';
@@ -14,6 +16,8 @@ import MapScreen from './screens/MapScreen';
 import ChatScreen from './screens/ChatScreen';
 import NewChatScreen from './screens/NewChatScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import FriendProfileScreen from './screens/FriendProfileScreen';
+import CityUsersScreen from './screens/CityUsersScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -42,6 +46,34 @@ function ConnectionsEventsStackNavigator() {
     >
       <Stack.Screen name="ConnectionsEventsList" component={ConnectionsEventsScreen} />
       <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Nested stack for Profile section
+function ProfileStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
+      <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Nested stack for Home section
+function HomeStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="HomeMain" component={MapScreen} />
+      <Stack.Screen name="CityUsers" component={CityUsersScreen} />
     </Stack.Navigator>
   );
 }
@@ -128,7 +160,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Home"
-        component={MapScreen}
+        component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused }) => <LogoIcon focused={focused} />,
@@ -150,7 +182,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, focused }) => (
@@ -184,10 +216,14 @@ function AppNavigator() {
 export default function App() {
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <AppNavigator />
-      </NavigationContainer>
+      <UserProvider>
+        <FriendsProvider>
+          <NavigationContainer>
+            <StatusBar style="auto" />
+            <AppNavigator />
+          </NavigationContainer>
+        </FriendsProvider>
+      </UserProvider>
     </ThemeProvider>
   );
 }
