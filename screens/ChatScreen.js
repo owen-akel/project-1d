@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,69 +8,66 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { ALL_USERS } from '../src/mock/users';
 
 export default function ChatScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation();
   const flatListRef = useRef(null);
 
-  // Sample conversations - Instagram/iOS style
-  const [conversations] = useState([
-    {
-      id: 1,
-      username: 'Alex',
-      avatar: '👤',
-      lastMessage: 'Hey! How are you doing?',
-      timestamp: '2m',
-      unread: 2,
-      isOnline: true,
-    },
-    {
-      id: 2,
-      username: 'Sam',
-      avatar: '👤',
-      lastMessage: 'Meet me at the park?',
-      timestamp: '15m',
-      unread: 0,
-      isOnline: true,
-    },
-    {
-      id: 3,
-      username: 'Jordan',
-      avatar: '👤',
-      lastMessage: 'Thanks for the recommendation!',
-      timestamp: '1h',
-      unread: 0,
-      isOnline: false,
-    },
-    {
-      id: 4,
-      username: 'Casey',
-      avatar: '👤',
-      lastMessage: 'See you there!',
-      timestamp: '2h',
-      unread: 1,
-      isOnline: true,
-    },
-    {
-      id: 5,
-      username: 'Morgan',
-      avatar: '👤',
-      lastMessage: 'That sounds great!',
-      timestamp: '3h',
-      unread: 0,
-      isOnline: false,
-    },
-    {
-      id: 6,
-      username: 'Taylor',
-      avatar: '👤',
-      lastMessage: 'Can\'t wait!',
-      timestamp: '5h',
-      unread: 0,
-      isOnline: false,
-    },
-  ]);
+  // Sample messages for each main character (deterministic)
+  const sampleMessages = [
+    'Hey! How are you doing?',
+    'Meet me at the park?',
+    'Thanks for the recommendation!',
+    'See you there!',
+    'That sounds great!',
+    'Can\'t wait!',
+    'What time works for you?',
+    'Sounds like a plan!',
+    'Let me know when you\'re free',
+    'Looking forward to it!',
+    'Thanks for organizing this!',
+    'Count me in!',
+  ];
+
+  const sampleTimestamps = [
+    '2m', '15m', '1h', '2h', '3h', '5h', '1d', '2d', '3d', '1w', '2w', '3w',
+  ];
+
+  // Generate conversations from the 12 main characters
+  const conversations = useMemo(() => {
+    const mainUsers = ALL_USERS.filter(user => user.id.startsWith('main-user-'));
+    
+    return mainUsers.map((user, index) => {
+      // Generate avatar initials from name
+      const initials = user.name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase();
+      
+      // Deterministic online status based on user ID
+      const isOnline = (parseInt(user.id.split('-').pop()) % 3) !== 0;
+      
+      // Deterministic unread count (0-3)
+      const unread = parseInt(user.id.split('-').pop()) % 4;
+      
+      // Deterministic message and timestamp based on index
+      const lastMessage = sampleMessages[index % sampleMessages.length];
+      const timestamp = sampleTimestamps[index % sampleTimestamps.length];
+      
+      return {
+        id: user.id,
+        username: user.name,
+        avatar: initials,
+        lastMessage: lastMessage,
+        timestamp: timestamp,
+        unread: unread,
+        isOnline: isOnline,
+      };
+    });
+  }, []);
 
   const renderConversation = ({ item }) => (
     <TouchableOpacity
@@ -134,7 +131,7 @@ export default function ChatScreen() {
         ref={flatListRef}
         data={conversations}
         renderItem={renderConversation}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />

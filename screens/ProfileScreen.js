@@ -1,6 +1,65 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
+import { ALL_USERS, USERS_BY_ID } from '../src/mock/users';
+import { useFriends } from '../context/FriendsContext';
+import { useUser } from '../context/UserContext';
+
+// Major US cities list (same as MapScreen)
+const MAJOR_US_CITIES = [
+  { name: 'New York', lat: 40.7128, lng: -74.0060 },
+  { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
+  { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
+  { name: 'Houston', lat: 29.7604, lng: -95.3698 },
+  { name: 'Phoenix', lat: 33.4484, lng: -112.0740 },
+  { name: 'Philadelphia', lat: 39.9526, lng: -75.1652 },
+  { name: 'San Antonio', lat: 29.4241, lng: -98.4936 },
+  { name: 'San Diego', lat: 32.7157, lng: -117.1611 },
+  { name: 'Dallas', lat: 32.7767, lng: -96.7970 },
+  { name: 'San Jose', lat: 37.3382, lng: -121.8863 },
+  { name: 'Austin', lat: 30.2672, lng: -97.7431 },
+  { name: 'Jacksonville', lat: 30.3322, lng: -81.6557 },
+  { name: 'Fort Worth', lat: 32.7555, lng: -97.3308 },
+  { name: 'Columbus', lat: 39.9612, lng: -82.9988 },
+  { name: 'Charlotte', lat: 35.2271, lng: -80.8431 },
+  { name: 'San Francisco', lat: 37.7749, lng: -122.4194 },
+  { name: 'Indianapolis', lat: 39.7684, lng: -86.1581 },
+  { name: 'Seattle', lat: 47.6062, lng: -122.3321 },
+  { name: 'Denver', lat: 39.7392, lng: -104.9903 },
+  { name: 'Washington', lat: 38.9072, lng: -77.0369 },
+  { name: 'Boston', lat: 42.3601, lng: -71.0589 },
+  { name: 'El Paso', lat: 31.7619, lng: -106.4850 },
+  { name: 'Nashville', lat: 36.1627, lng: -86.7816 },
+  { name: 'Detroit', lat: 42.3314, lng: -83.0458 },
+  { name: 'Oklahoma City', lat: 35.4676, lng: -97.5164 },
+  { name: 'Portland', lat: 45.5152, lng: -122.6784 },
+  { name: 'Las Vegas', lat: 36.1699, lng: -115.1398 },
+  { name: 'Memphis', lat: 35.1495, lng: -90.0490 },
+  { name: 'Louisville', lat: 38.2527, lng: -85.7585 },
+  { name: 'Baltimore', lat: 39.2904, lng: -76.6122 },
+  { name: 'Milwaukee', lat: 43.0389, lng: -87.9065 },
+  { name: 'Albuquerque', lat: 35.0844, lng: -106.6504 },
+  { name: 'Tucson', lat: 32.2226, lng: -110.9747 },
+  { name: 'Fresno', lat: 36.7378, lng: -119.7871 },
+  { name: 'Sacramento', lat: 38.5816, lng: -121.4944 },
+  { name: 'Kansas City', lat: 39.0997, lng: -94.5786 },
+  { name: 'Mesa', lat: 33.4152, lng: -111.8315 },
+  { name: 'Atlanta', lat: 33.7490, lng: -84.3880 },
+  { name: 'Omaha', lat: 41.2565, lng: -95.9345 },
+  { name: 'Colorado Springs', lat: 38.8339, lng: -104.8214 },
+  { name: 'Raleigh', lat: 35.7796, lng: -78.6382 },
+  { name: 'Miami', lat: 25.7617, lng: -80.1918 },
+  { name: 'Virginia Beach', lat: 36.8529, lng: -75.9780 },
+  { name: 'Oakland', lat: 37.8044, lng: -122.2712 },
+  { name: 'Minneapolis', lat: 44.9778, lng: -93.2650 },
+  { name: 'Tulsa', lat: 36.1540, lng: -95.9928 },
+  { name: 'Cleveland', lat: 41.4993, lng: -81.6944 },
+  { name: 'Wichita', lat: 37.6872, lng: -97.3301 },
+  { name: 'Arlington', lat: 32.7357, lng: -97.1081 },
+  { name: 'Tampa', lat: 27.9506, lng: -82.4572 },
+  { name: 'New Orleans', lat: 29.9511, lng: -90.0715 },
+];
 
 const INTERESTS_BY_CATEGORY = {
   'Sports & Fitness': [
@@ -67,23 +126,22 @@ const ALL_INTERESTS = Object.values(INTERESTS_BY_CATEGORY).flat();
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
+  const { friends, addFriend, removeFriend, isFriend } = useFriends();
+  const { user, updateUser, setResidence } = useUser();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isProfileEditModalVisible, setIsProfileEditModalVisible] = useState(false);
+  const [isResidenceSelectorVisible, setIsResidenceSelectorVisible] = useState(false);
+  const [isFriendsModalVisible, setIsFriendsModalVisible] = useState(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
   const [interestSearchQuery, setInterestSearchQuery] = useState('');
+  const [citySearchQuery, setCitySearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
-  const [user, setUser] = useState({
-    name: 'Alex Johnson',
-    photo: null, // In real app, this would be an image URL
-    hometown: 'San Francisco, CA',
-    college: 'Stanford University',
-    age: 2024,
-    interests: [],
-  });
   const [profileFormData, setProfileFormData] = useState({
-    name: '',
-    hometown: '',
-    college: '',
-    age: '',
+    name: user.name || '',
+    hometown: user.hometown || '',
+    college: user.college || '',
+    age: user.age ? user.age.toString() : '',
   });
 
   const getFilteredCategories = () => {
@@ -97,6 +155,16 @@ export default function ProfileScreen() {
       }
     });
     return categories;
+  };
+
+  const getFilteredCities = () => {
+    if (!citySearchQuery || !citySearchQuery.trim()) {
+      return MAJOR_US_CITIES;
+    }
+    const searchQuery = citySearchQuery.toLowerCase();
+    return MAJOR_US_CITIES.filter((city) =>
+      city.name.toLowerCase().includes(searchQuery)
+    );
   };
 
   const filteredCategories = getFilteredCategories();
@@ -116,20 +184,16 @@ export default function ProfileScreen() {
   };
 
   const toggleInterest = (interest) => {
-    setUser((prevUser) => {
-      const currentInterests = prevUser.interests || [];
-      if (currentInterests.includes(interest)) {
-        return {
-          ...prevUser,
-          interests: currentInterests.filter((i) => i !== interest),
-        };
-      } else {
-        return {
-          ...prevUser,
-          interests: [...currentInterests, interest],
-        };
-      }
-    });
+    const currentInterests = user.interests || [];
+    if (currentInterests.includes(interest)) {
+      updateUser({
+        interests: currentInterests.filter((i) => i !== interest),
+      });
+    } else {
+      updateUser({
+        interests: [...currentInterests, interest],
+      });
+    }
   };
 
   const handleSave = () => {
@@ -149,14 +213,41 @@ export default function ProfileScreen() {
   };
 
   const handleProfileSave = () => {
-    setUser((prevUser) => ({
-      ...prevUser,
-      name: profileFormData.name || prevUser.name,
-      hometown: profileFormData.hometown || prevUser.hometown,
-      college: profileFormData.college || prevUser.college,
-      age: profileFormData.age ? parseInt(profileFormData.age) || prevUser.age : prevUser.age,
-    }));
+    updateUser({
+      name: profileFormData.name || user.name,
+      hometown: profileFormData.hometown || user.hometown,
+      college: profileFormData.college || user.college,
+      age: profileFormData.age ? parseInt(profileFormData.age) || user.age : user.age,
+    });
     setIsProfileEditModalVisible(false);
+  };
+
+  const handleCitySelect = (cityName) => {
+    setResidence(cityName);
+    setIsResidenceSelectorVisible(false);
+    setCitySearchQuery('');
+  };
+
+  const getFilteredUsers = () => {
+    if (!friendSearchQuery || !friendSearchQuery.trim()) {
+      return ALL_USERS;
+    }
+    const searchQuery = friendSearchQuery.toLowerCase();
+    return ALL_USERS.filter((user) =>
+      user.name.toLowerCase().includes(searchQuery)
+    );
+  };
+
+  const handleFriendToggle = (userId) => {
+    if (isFriend(userId)) {
+      removeFriend(userId);
+    } else {
+      addFriend(userId);
+    }
+  };
+
+  const handleFriendPress = (userId) => {
+    navigation.navigate('FriendProfile', { userId });
   };
 
   return (
@@ -184,7 +275,17 @@ export default function ProfileScreen() {
 
         {/* Name */}
         <View style={styles.nameSection}>
-          <Text style={[styles.name, { color: colors.textPrimary }]}>{user.name}</Text>
+          <View style={styles.nameAndResidence}>
+            <Text style={[styles.name, { color: colors.textPrimary }]}>{user.name}</Text>
+            <TouchableOpacity 
+              onPress={() => setIsResidenceSelectorVisible(true)}
+              style={styles.residenceButton}
+            >
+              <Text style={[styles.residenceButtonText, { color: colors.textSecondary }]}>
+                {user.residence || 'Set residence'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             onPress={handleProfileEditOpen}
             style={[styles.topEditButton, { backgroundColor: colors.primary }]}
@@ -245,6 +346,88 @@ export default function ProfileScreen() {
           ) : (
             <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
               No Interests Selected Yet!
+            </Text>
+          )}
+        </View>
+
+        {/* My Friends */}
+        <View style={[styles.interestsSection, styles.friendsSection]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>My Friends</Text>
+            <TouchableOpacity
+              onPress={() => setIsFriendsModalVisible(true)}
+              style={[styles.editButton, { backgroundColor: colors.primary }]}
+            >
+              <Text style={styles.editButtonIcon}>+</Text>
+            </TouchableOpacity>
+          </View>
+          {friends && friends.length > 0 ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.friendsContainer}
+            >
+              {friends.map((friendId) => {
+                const friend = USERS_BY_ID.get(friendId);
+                if (!friend) return null;
+                return (
+                  <View
+                    key={friendId}
+                    style={[
+                      styles.friendItem,
+                      {
+                        backgroundColor: colors.backgroundSecondary,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      style={styles.friendItemContent}
+                      onPress={() => handleFriendPress(friendId)}
+                    >
+                      <View style={[styles.friendAvatar, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.friendAvatarText}>
+                          {friend.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
+                        </Text>
+                      </View>
+                      <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {friend.name.split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.alert(
+                          'Remove Friend',
+                          `Are you sure you want to remove ${friend.name} as a friend?`,
+                          [
+                            {
+                              text: 'Cancel',
+                              style: 'cancel',
+                            },
+                            {
+                              text: 'Remove',
+                              style: 'destructive',
+                              onPress: () => removeFriend(friendId),
+                            },
+                          ]
+                        );
+                      }}
+                      style={styles.removeFriendButton}
+                    >
+                      <Text style={[styles.removeFriendButtonText, { color: colors.error }]}>
+                        ✕
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
+              No friends yet. Tap + to add friends!
             </Text>
           )}
         </View>
@@ -406,6 +589,198 @@ export default function ProfileScreen() {
           </View>
         </Modal>
 
+        {/* City Selector Modal */}
+        <Modal
+          visible={isResidenceSelectorVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => {
+            setIsResidenceSelectorVisible(false);
+            setCitySearchQuery('');
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select City</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsResidenceSelectorVisible(false);
+                    setCitySearchQuery('');
+                  }}
+                  style={styles.closeButton}
+                >
+                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    {
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                    },
+                  ]}
+                  placeholder="Search cities..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={citySearchQuery}
+                  onChangeText={setCitySearchQuery}
+                  autoFocus={true}
+                />
+              </View>
+              <ScrollView 
+                style={styles.modalBody} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.modalBodyContent}
+              >
+                {getFilteredCities().map((city) => (
+                  <TouchableOpacity
+                    key={city.name}
+                    style={[
+                      styles.cityItem,
+                      {
+                        backgroundColor: user.residence === city.name
+                          ? 'rgba(20, 184, 166, 0.15)'
+                          : colors.backgroundSecondary,
+                        borderColor: user.residence === city.name
+                          ? colors.primary
+                          : colors.border,
+                      },
+                    ]}
+                    onPress={() => handleCitySelect(city.name)}
+                  >
+                    <Text style={[
+                      styles.cityItemText,
+                      { 
+                        color: user.residence === city.name 
+                          ? colors.primary 
+                          : colors.textPrimary,
+                        fontWeight: user.residence === city.name ? '700' : '400',
+                      },
+                    ]}>
+                      {city.name}
+                    </Text>
+                    {user.residence === city.name && (
+                      <Text style={[styles.cityItemCheck, { color: colors.primary }]}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+                {getFilteredCities().length === 0 && (
+                  <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
+                    No cities found
+                  </Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add Friends Modal */}
+        <Modal
+          visible={isFriendsModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => {
+            setIsFriendsModalVisible(false);
+            setFriendSearchQuery('');
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Friends</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsFriendsModalVisible(false);
+                    setFriendSearchQuery('');
+                  }}
+                  style={styles.closeButton}
+                >
+                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    {
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                    },
+                  ]}
+                  placeholder="Search users..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={friendSearchQuery}
+                  onChangeText={setFriendSearchQuery}
+                  autoFocus={true}
+                />
+              </View>
+              <ScrollView 
+                style={styles.modalBody} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.modalBodyContent}
+              >
+                {getFilteredUsers().map((user) => {
+                  const isAlreadyFriend = isFriend(user.id);
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[
+                        styles.modalFriendItem,
+                        {
+                          backgroundColor: isAlreadyFriend
+                            ? 'rgba(20, 184, 166, 0.15)'
+                            : colors.backgroundSecondary,
+                          borderColor: isAlreadyFriend
+                            ? colors.primary
+                            : colors.border,
+                        },
+                      ]}
+                      onPress={() => handleFriendToggle(user.id)}
+                    >
+                      <View style={[styles.modalFriendAvatar, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.modalFriendAvatarText}>
+                          {user.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
+                        </Text>
+                      </View>
+                      <View style={styles.modalFriendInfo}>
+                        <Text style={[
+                          styles.modalFriendName,
+                          { 
+                            color: isAlreadyFriend 
+                              ? colors.primary 
+                              : colors.textPrimary,
+                            fontWeight: isAlreadyFriend ? '700' : '400',
+                          },
+                        ]}>
+                          {user.name}
+                        </Text>
+                        <Text style={[styles.modalFriendCity, { color: colors.textSecondary }]}>
+                          {user.city}
+                        </Text>
+                      </View>
+                      {isAlreadyFriend && (
+                        <Text style={[styles.cityItemCheck, { color: colors.primary }]}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                {getFilteredUsers().length === 0 && (
+                  <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
+                    No users found
+                  </Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
         {/* Edit Profile Info Modal */}
         <Modal
           visible={isProfileEditModalVisible}
@@ -509,6 +884,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Modal>
+
+
       </ScrollView>
     </View>
   );
@@ -563,12 +940,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
+  nameAndResidence: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
   name: {
     fontSize: 28,
     fontWeight: '700',
     color: '#0f172a',
     letterSpacing: -0.5,
-    flex: 1,
+    marginBottom: 4,
+  },
+  residenceButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+  },
+  residenceButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748b',
   },
   topEditButton: {
     width: 36,
@@ -608,6 +999,10 @@ const styles = StyleSheet.create({
   interestsSection: {
     width: '100%',
     paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  friendsSection: {
+    marginTop: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -655,6 +1050,95 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8,
   },
+  friendsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 20,
+  },
+  friendItem: {
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 70,
+    maxWidth: 80,
+    position: 'relative',
+  },
+  friendAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#14b8a6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  friendAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  friendName: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  friendItemContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  removeFriendButton: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeFriendButtonText: {
+    fontSize: 10,
+    color: '#ef4444',
+    fontWeight: '700',
+  },
+  modalFriendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  modalFriendAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#14b8a6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  modalFriendAvatarText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  modalFriendInfo: {
+    flex: 1,
+  },
+  modalFriendName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  modalFriendCity: {
+    fontSize: 11,
+    color: '#64748b',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -696,6 +1180,10 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: 24,
     maxHeight: 400,
+  },
+  modalBodyContent: {
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   modalBodyContent: {
     paddingTop: 16,
@@ -816,6 +1304,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: 8,
+  },
+  cityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  cityItemText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  cityItemCheck: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 12,
+  },
+  noResultsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    paddingVertical: 40,
   },
   input: {
     backgroundColor: '#f8fafc',

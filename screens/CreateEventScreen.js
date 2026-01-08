@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,13 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { ALL_USERS } from '../src/mock/users';
+import { useUser } from '../context/UserContext';
 
 export default function CreateEventScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const { user } = useUser();
   
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
@@ -21,51 +24,30 @@ export default function CreateEventScreen() {
   const [description, setDescription] = useState('');
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
 
-  // Sample connections - in a real app, this would come from a backend
-  const [connections] = useState([
-    {
-      id: 1,
-      userId: 'user1',
-      username: 'Alex',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 2,
-      userId: 'user2',
-      username: 'Sam',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 3,
-      userId: 'user3',
-      username: 'Jordan',
-      avatar: '👤',
-      isOnline: false,
-    },
-    {
-      id: 4,
-      userId: 'user4',
-      username: 'Casey',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 5,
-      userId: 'user5',
-      username: 'Morgan',
-      avatar: '👤',
-      isOnline: false,
-    },
-    {
-      id: 6,
-      userId: 'user6',
-      username: 'Taylor',
-      avatar: '👤',
-      isOnline: false,
-    },
-  ]);
+  // Get the 12 main characters for collaboration
+  const mainCharacters = useMemo(() => {
+    return ALL_USERS
+      .filter(user => user.id.startsWith('main-user-'))
+      .map((user, index) => {
+        // Generate avatar initials from name
+        const initials = user.name
+          .split(' ')
+          .map(n => n[0])
+          .join('')
+          .toUpperCase();
+        
+        // Deterministic online status based on user ID
+        const isOnline = (parseInt(user.id.split('-').pop()) % 3) !== 0;
+        
+        return {
+          id: user.id,
+          userId: user.id,
+          username: user.name,
+          avatar: initials,
+          isOnline: isOnline,
+        };
+      });
+  }, []);
 
   const toggleCollaborator = (connection) => {
     setSelectedCollaborators((prev) => {
@@ -77,24 +59,44 @@ export default function CreateEventScreen() {
     });
   };
 
+  // Map city names from UserContext to mock data city codes
+  const mapCityNameToMockCity = (cityName) => {
+    const cityMap = {
+      'New York': 'NYC',
+      'Los Angeles': 'LA',
+      'San Francisco': 'SF',
+    };
+    return cityMap[cityName] || cityName;
+  };
+
   const handleCreateEvent = () => {
     if (!title.trim() || !time.trim() || !destination.trim()) {
       alert('Please fill in all required fields (Title, Time, and Destination)');
       return;
     }
 
+    const CURRENT_USER_ID = 'current-user-1';
+    const mockCityName = user?.residence ? mapCityNameToMockCity(user.residence) : 'NYC';
+    
+    // Generate a unique event ID
+    const eventId = `user-event-${Date.now()}`;
+    
     const eventData = {
-      title,
-      time,
-      destination,
-      description,
-      collaborators: selectedCollaborators,
+      id: eventId,
+      title: title.trim(),
+      location: destination.trim(),
+      date: time.trim(),
+      hostId: CURRENT_USER_ID,
+      city: mockCityName,
+      type: 'social', // Default type for user-created events
+      attendeeIds: [], // Start with empty array
+      description: description.trim(),
+      collaborators: selectedCollaborators.map(c => c.userId),
+      isUserCreated: true,
     };
 
-    console.log('Creating event:', eventData);
-    // In a real app, this would save to a backend
-    alert('Event created successfully!');
-    navigation.goBack();
+    // Pass event data back via navigation params and navigate back
+    navigation.navigate('ConnectionsEventsList', { newEvent: eventData });
   };
 
   const renderCollaborator = ({ item }) => {
@@ -238,9 +240,9 @@ export default function CreateEventScreen() {
             Select connections to co-host this event
           </Text>
           <FlatList
-            data={connections}
+            data={mainCharacters}
             renderItem={renderCollaborator}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => item.id}
             scrollEnabled={false}
             style={styles.collaboratorsList}
           />
