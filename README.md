@@ -21,6 +21,13 @@ A React Native social media application built with Expo that connects people one
   - Settings and preferences
   - Dark mode toggle
 
+## Running locally
+
+1. Backend: `cd events-api && npm start` (requires `events-api/.env` with `TICKETMASTER_API_KEY`)
+2. App: `npm start`
+
+Or run both at once from the root: `npm run dev`
+
 ## Getting Started
 
 ### Prerequisites

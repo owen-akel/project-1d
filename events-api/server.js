@@ -3,7 +3,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
+
+if (!process.env.TICKETMASTER_API_KEY) {
+  console.error('❌ TICKETMASTER_API_KEY not found. Run from the events-api folder and confirm events-api/.env exists.');
+  process.exit(1);
+}
+console.log('✅ Ticketmaster key loaded');
 
 const app = express();
 
