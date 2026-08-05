@@ -39,10 +39,53 @@ A React Native social media application built with Expo that connects people one
 
 ## Running locally
 
-1. Backend: `cd events-api && npm start` (requires `events-api/.env` with `TICKETMASTER_API_KEY`)
-2. App: `npm start`
+Start to finish on a fresh clone. There are **two** npm projects here — the Expo
+app at the root and the events API in `events-api/` — so both need installing.
 
-Or run both at once from the root: `npm run dev`
+```bash
+# 1. App dependencies
+npm install
+
+# 2. Backend dependencies
+cd events-api && npm install && cd ..
+
+# 3. Backend config — copy the template and add your own Ticketmaster key
+cp events-api/.env.example events-api/.env
+# then edit events-api/.env and set TICKETMASTER_API_KEY
+
+# 4. Run the API and the app together
+npm run dev
+```
+
+Then press `i` in the Expo output to open the iOS simulator (or scan the QR code
+with Expo Go).
+
+### Getting a Ticketmaster key
+
+Register at
+[developer.ticketmaster.com](https://developer-acct.ticketmaster.com/user/register)
+and use the **Consumer Key** from your app. It's free, and the default quota is
+plenty for development.
+
+The key is per-developer and must never be committed — `events-api/.env` is
+gitignored and should stay that way.
+
+### Running without a key
+
+The app still runs: `events-api` refuses to start without the key, the Local tab's
+fetch fails, and it falls back to the mock events in `src/mock/events.js` with a
+"Live events unavailable" note. Everything else — the connection web, friend
+requests, chat, invites — works normally, since it's all local mock data.
+
+### Notes
+
+- The app reaches the API at `http://localhost:4000`, which works on the
+  simulator and web but **not** on a physical phone over Expo Go. Point
+  `EVENTS_API_BASE_URL` in `screens/LocalEventsScreen.js` at your machine's LAN
+  IP to test on a real device.
+- No state persists. Profile edits, friends, requests, and messages all live in
+  React context, so a reload resets everything to the seeded state — which means
+  a fresh clone looks the same as any other.
 
 ## Getting Started
 
