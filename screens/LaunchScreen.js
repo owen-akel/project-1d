@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Image, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LaunchScreen() {
   const navigation = useNavigation();
+  const { colors } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
@@ -32,7 +34,7 @@ export default function LaunchScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Animated.View
         style={[
           styles.logoContainer,
@@ -55,7 +57,6 @@ export default function LaunchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
   },

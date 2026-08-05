@@ -1,1342 +1,936 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  Switch,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ALL_USERS, USERS_BY_ID } from '../src/mock/users';
+import { useTheme } from '../context/ThemeContext';
 import { useFriends } from '../context/FriendsContext';
 import { useUser } from '../context/UserContext';
-
-// Major US cities list (same as MapScreen)
-const MAJOR_US_CITIES = [
-  { name: 'New York', lat: 40.7128, lng: -74.0060 },
-  { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
-  { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
-  { name: 'Houston', lat: 29.7604, lng: -95.3698 },
-  { name: 'Phoenix', lat: 33.4484, lng: -112.0740 },
-  { name: 'Philadelphia', lat: 39.9526, lng: -75.1652 },
-  { name: 'San Antonio', lat: 29.4241, lng: -98.4936 },
-  { name: 'San Diego', lat: 32.7157, lng: -117.1611 },
-  { name: 'Dallas', lat: 32.7767, lng: -96.7970 },
-  { name: 'San Jose', lat: 37.3382, lng: -121.8863 },
-  { name: 'Austin', lat: 30.2672, lng: -97.7431 },
-  { name: 'Jacksonville', lat: 30.3322, lng: -81.6557 },
-  { name: 'Fort Worth', lat: 32.7555, lng: -97.3308 },
-  { name: 'Columbus', lat: 39.9612, lng: -82.9988 },
-  { name: 'Charlotte', lat: 35.2271, lng: -80.8431 },
-  { name: 'San Francisco', lat: 37.7749, lng: -122.4194 },
-  { name: 'Indianapolis', lat: 39.7684, lng: -86.1581 },
-  { name: 'Seattle', lat: 47.6062, lng: -122.3321 },
-  { name: 'Denver', lat: 39.7392, lng: -104.9903 },
-  { name: 'Washington', lat: 38.9072, lng: -77.0369 },
-  { name: 'Boston', lat: 42.3601, lng: -71.0589 },
-  { name: 'El Paso', lat: 31.7619, lng: -106.4850 },
-  { name: 'Nashville', lat: 36.1627, lng: -86.7816 },
-  { name: 'Detroit', lat: 42.3314, lng: -83.0458 },
-  { name: 'Oklahoma City', lat: 35.4676, lng: -97.5164 },
-  { name: 'Portland', lat: 45.5152, lng: -122.6784 },
-  { name: 'Las Vegas', lat: 36.1699, lng: -115.1398 },
-  { name: 'Memphis', lat: 35.1495, lng: -90.0490 },
-  { name: 'Louisville', lat: 38.2527, lng: -85.7585 },
-  { name: 'Baltimore', lat: 39.2904, lng: -76.6122 },
-  { name: 'Milwaukee', lat: 43.0389, lng: -87.9065 },
-  { name: 'Albuquerque', lat: 35.0844, lng: -106.6504 },
-  { name: 'Tucson', lat: 32.2226, lng: -110.9747 },
-  { name: 'Fresno', lat: 36.7378, lng: -119.7871 },
-  { name: 'Sacramento', lat: 38.5816, lng: -121.4944 },
-  { name: 'Kansas City', lat: 39.0997, lng: -94.5786 },
-  { name: 'Mesa', lat: 33.4152, lng: -111.8315 },
-  { name: 'Atlanta', lat: 33.7490, lng: -84.3880 },
-  { name: 'Omaha', lat: 41.2565, lng: -95.9345 },
-  { name: 'Colorado Springs', lat: 38.8339, lng: -104.8214 },
-  { name: 'Raleigh', lat: 35.7796, lng: -78.6382 },
-  { name: 'Miami', lat: 25.7617, lng: -80.1918 },
-  { name: 'Virginia Beach', lat: 36.8529, lng: -75.9780 },
-  { name: 'Oakland', lat: 37.8044, lng: -122.2712 },
-  { name: 'Minneapolis', lat: 44.9778, lng: -93.2650 },
-  { name: 'Tulsa', lat: 36.1540, lng: -95.9928 },
-  { name: 'Cleveland', lat: 41.4993, lng: -81.6944 },
-  { name: 'Wichita', lat: 37.6872, lng: -97.3301 },
-  { name: 'Arlington', lat: 32.7357, lng: -97.1081 },
-  { name: 'Tampa', lat: 27.9506, lng: -82.4572 },
-  { name: 'New Orleans', lat: 29.9511, lng: -90.0715 },
-];
-
-const INTERESTS_BY_CATEGORY = {
-  'Sports & Fitness': [
-    'Running', 'Lifting', 'Soccer', 'Basketball', 'Tennis', 'Pickleball', 'Golf', 
-    'Baseball', 'Softball', 'Volleyball', 'Swimming', 'Cycling', 'Yoga', 'Pilates',
-    'CrossFit', 'Martial Arts', 'Boxing', 'Rock Climbing', 'Hiking', 'Surfing',
-    'Snowboarding', 'Skiing', 'Ice Skating', 'Skateboarding', 'Mountain Biking',
-    'Rowing', 'Cricket', 'Rugby', 'Badminton', 'Table Tennis', 'Archery',
-  ],
-  'Music & Arts': [
-    'Live Music', 'Concerts', 'Playing Guitar', 'Playing Piano', 'DJing', 
-    'Singing', 'Songwriting', 'Photography', 'Art', 'Painting', 'Drawing',
-    'Sculpting', 'Digital Art', 'Pottery', 'Calligraphy', 'Dance', 'Ballet',
-    'Theater', 'Acting', 'Stand-up Comedy', 'Writing', 'Poetry',
-  ],
-  'Social & Entertainment': [
-    'Drinking', 'Wine Tasting', 'Cocktail Making', 'Breweries', 'Nightlife',
-    'Parties', 'Festivals', 'Food & Dining', 'Cooking', 'Baking', 'Foodie',
-    'Travel', 'Adventure Travel', 'Backpacking', 'Camping', 'Beach',
-  ],
-  'Intellectual & Creative': [
-    'Reading', 'Book Clubs', 'Podcasts', 'Learning Languages', 'Chess',
-    'Board Games', 'Video Games', 'Gaming', 'Puzzles', 'Crossword Puzzles',
-    'Trivia', 'Debate', 'Philosophy', 'History', 'Astronomy', 'Science',
-  ],
-  'Outdoor & Nature': [
-    'Gardening', 'Bird Watching', 'Fishing', 'Hunting', 'Boating', 'Sailing',
-    'Kayaking', 'Paddleboarding', 'Snorkeling', 'Scuba Diving', 'Wildlife',
-    'Nature Photography', 'Stargazing', 'Outdoor Adventure',
-  ],
-  'Social Activities': [
-    'Networking', 'Meetups', 'Volunteering', 'Community Service', 'Mentoring',
-    'Ball Games', 'Team Sports', 'Social Sports',
-  ],
-  'Other Hobbies': [
-    'Collecting', 'Antiques', 'Fashion', 'Styling', 'Fitness Modeling',
-    'Meditation', 'Mindfulness', 'Wellness', 'Self-Care', 'Spa',
-    'Shopping', 'Thrifting', 'Flea Markets', 'Markets', 'Crafting',
-    'Sewing', 'Knitting', 'Crocheting', 'Woodworking', 'DIY Projects',
-    'Home Improvement', 'Interior Design', 'Real Estate', 'Investing',
-    'Cryptocurrency', 'Trading', 'Stocks', 'Entrepreneurship', 'Startups',
-    'Tech', 'Programming', 'Coding', 'Design', 'Fashion Design',
-    'Film', 'Movies', 'Cinema', 'Documentaries', 'TV Shows', 'Binge Watching',
-    'Streaming', 'Anime', 'Manga', 'Comics', 'Graphic Novels',
-    'Cars', 'Motorcycles', 'Racing', 'Car Shows', 'Auto Mechanics',
-    'Dogs', 'Cats', 'Pets', 'Animal Rescue', 'Horseback Riding',
-    'Motorcycling', 'ATV', 'Dirt Biking', 'Flying', 'Aviation',
-    'Magic', 'Card Tricks', 'Juggling', 'Circus Arts',
-  ],
-};
-
-const CATEGORY_ICONS = {
-  'Sports & Fitness': '⚽',
-  'Music & Arts': '🎨',
-  'Social & Entertainment': '🍻',
-  'Intellectual & Creative': '📚',
-  'Outdoor & Nature': '🌲',
-  'Social Activities': '🤝',
-  'Other Hobbies': '🎯',
-};
-
-// Flatten all interests for search functionality
-const ALL_INTERESTS = Object.values(INTERESTS_BY_CATEGORY).flat();
+import { USERS_BY_ID } from '../src/mock/users';
+import { FRIENDS_BY_USER_ID } from '../src/mock/graph';
+import { MAJOR_US_CITIES } from '../src/data/cities';
+import { INTERESTS_BY_CATEGORY, CATEGORY_ICONS, ALL_INTERESTS } from '../src/data/interests';
+import {
+  getConnectionStats,
+  getFriendsWithPeers,
+  getReachablePeople,
+  getMutualFriendCount,
+} from '../src/social/connections';
+import { canViewUser, CURRENT_USER_ID } from '../src/social/visibility';
+import useOpenChat from '../src/hooks/useOpenChat';
+import {
+  Screen,
+  Card,
+  Button,
+  Chip,
+  Avatar,
+  SegmentedControl,
+  StatTile,
+  EmptyState,
+  SearchInput,
+  PersonRow,
+  BottomSheet,
+  ConnectionWeb,
+} from '../src/ui';
 
 export default function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing, radius, typography, isDarkMode, toggleDarkMode } = useTheme();
   const navigation = useNavigation();
-  const { friends, addFriend, removeFriend, isFriend } = useFriends();
+  const { friends, removeFriend, pendingRequestCount } = useFriends();
   const { user, updateUser, setResidence } = useUser();
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [isProfileEditModalVisible, setIsProfileEditModalVisible] = useState(false);
-  const [isResidenceSelectorVisible, setIsResidenceSelectorVisible] = useState(false);
-  const [isFriendsModalVisible, setIsFriendsModalVisible] = useState(false);
-  const [friendSearchQuery, setFriendSearchQuery] = useState('');
-  const [interestSearchQuery, setInterestSearchQuery] = useState('');
-  const [citySearchQuery, setCitySearchQuery] = useState('');
+  const { openDirectMessage } = useOpenChat();
+
+  const [activeTab, setActiveTab] = useState('profile');
+  const [webCity, setWebCity] = useState('all');
+  const [focusedFriendId, setFocusedFriendId] = useState(null);
+  const [citySheetPeopleOpen, setCitySheetPeopleOpen] = useState(false);
+
+  const [interestsSheetOpen, setInterestsSheetOpen] = useState(false);
+  const [citySheetOpen, setCitySheetOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+
+  const [interestQuery, setInterestQuery] = useState('');
+  const [cityQuery, setCityQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
-  const [profileFormData, setProfileFormData] = useState({
-    name: user.name || '',
-    hometown: user.hometown || '',
-    college: user.college || '',
-    age: user.age ? user.age.toString() : '',
-  });
+  const [editForm, setEditForm] = useState({ name: '', hometown: '', college: '', age: '' });
 
-  const getFilteredCategories = () => {
-    const categories = {};
-    Object.keys(INTERESTS_BY_CATEGORY).forEach((categoryName) => {
-      const filtered = INTERESTS_BY_CATEGORY[categoryName].filter((interest) =>
-        interest.toLowerCase().includes(interestSearchQuery.toLowerCase())
-      );
-      if (filtered.length > 0 || interestSearchQuery === '') {
-        categories[categoryName] = filtered;
-      }
+  // Filters inside the "people in this city" sheet
+  const [peopleInterestFilters, setPeopleInterestFilters] = useState([]);
+  const [peopleDegreeFilter, setPeopleDegreeFilter] = useState('all');
+
+  const stats = useMemo(() => getConnectionStats(friends), [friends]);
+  const webFriends = useMemo(() => getFriendsWithPeers(friends), [friends]);
+  const reachable = useMemo(() => getReachablePeople(friends), [friends]);
+
+  // Cities across the whole network — direct and indirect — since highlighting
+  // covers both degrees.
+  const webCities = useMemo(() => {
+    const counts = new Map();
+    reachable.forEach(({ user: person }) => {
+      if (!person.city) return;
+      counts.set(person.city, (counts.get(person.city) || 0) + 1);
     });
-    return categories;
-  };
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([city, count]) => ({ city, count }));
+  }, [reachable]);
 
-  const getFilteredCities = () => {
-    if (!citySearchQuery || !citySearchQuery.trim()) {
-      return MAJOR_US_CITIES;
-    }
-    const searchQuery = citySearchQuery.toLowerCase();
-    return MAJOR_US_CITIES.filter((city) =>
-      city.name.toLowerCase().includes(searchQuery)
-    );
-  };
+  /** Everyone in the selected city, with degree, connectors and mutual count. */
+  const cityPeople = useMemo(() => {
+    if (webCity === 'all') return [];
+    return reachable
+      .filter(({ user: person }) => person.city === webCity)
+      .map((entry) => ({
+        ...entry,
+        mutualCount: getMutualFriendCount(entry.user.id, friends),
+      }))
+      .sort((a, b) => {
+        if (a.degree !== b.degree) return a.degree - b.degree;
+        if (b.mutualCount !== a.mutualCount) return b.mutualCount - a.mutualCount;
+        return a.user.name.localeCompare(b.user.name);
+      });
+  }, [reachable, webCity, friends]);
 
-  const filteredCategories = getFilteredCategories();
+  const highlightedIds = useMemo(
+    () => new Set(cityPeople.map(({ user: person }) => person.id)),
+    [cityPeople]
+  );
 
-  // For search functionality, still maintain flat list
-  const filteredInterests = interestSearchQuery
-    ? ALL_INTERESTS.filter((interest) =>
-        interest.toLowerCase().includes(interestSearchQuery.toLowerCase())
-      )
-    : [];
+  // Interests actually present among the people in this city, so the filter
+  // never offers a chip that matches nobody.
+  const cityInterestOptions = useMemo(() => {
+    const counts = new Map();
+    cityPeople.forEach(({ user: person }) => {
+      (person.interests || []).forEach((interest) => {
+        counts.set(interest, (counts.get(interest) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 24)
+      .map(([interest]) => interest);
+  }, [cityPeople]);
 
-  const toggleCategory = (categoryName) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryName]: !prev[categoryName],
-    }));
+  const filteredCityPeople = useMemo(() => {
+    return cityPeople.filter(({ user: person, degree }) => {
+      if (peopleDegreeFilter === 'friends' && degree !== 1) return false;
+      if (peopleDegreeFilter === 'fof' && degree !== 2) return false;
+      if (peopleInterestFilters.length === 0) return true;
+      return (person.interests || []).some((interest) => peopleInterestFilters.includes(interest));
+    });
+  }, [cityPeople, peopleDegreeFilter, peopleInterestFilters]);
+
+  const focusedFriend = useMemo(
+    () => (focusedFriendId ? USERS_BY_ID.get(focusedFriendId) : null),
+    [focusedFriendId]
+  );
+
+  const focusedPeerCount = useMemo(() => {
+    if (!focusedFriendId) return 0;
+    return (FRIENDS_BY_USER_ID.get(focusedFriendId) || []).filter(
+      (peerId) => peerId !== CURRENT_USER_ID && canViewUser(peerId, friends)
+    ).length;
+  }, [focusedFriendId, friends]);
+
+  const friendRows = useMemo(
+    () =>
+      friends
+        .map((friendId) => {
+          const friend = USERS_BY_ID.get(friendId);
+          if (!friend) return null;
+          return { ...friend, mutualCount: getMutualFriendCount(friendId, friends) };
+        })
+        .filter(Boolean),
+    [friends]
+  );
+
+  const filteredCities = useMemo(() => {
+    const query = cityQuery.trim().toLowerCase();
+    if (!query) return MAJOR_US_CITIES;
+    return MAJOR_US_CITIES.filter((city) => city.name.toLowerCase().includes(query));
+  }, [cityQuery]);
+
+  const interestSearchResults = useMemo(() => {
+    const query = interestQuery.trim().toLowerCase();
+    if (!query) return null;
+    return ALL_INTERESTS.filter((interest) => interest.toLowerCase().includes(query));
+  }, [interestQuery]);
+
+  const selectWebCity = (city) => {
+    setWebCity(city);
+    setFocusedFriendId(null);
+    setPeopleInterestFilters([]);
+    setPeopleDegreeFilter('all');
   };
 
   const toggleInterest = (interest) => {
-    const currentInterests = user.interests || [];
-    if (currentInterests.includes(interest)) {
-      updateUser({
-        interests: currentInterests.filter((i) => i !== interest),
-      });
-    } else {
-      updateUser({
-        interests: [...currentInterests, interest],
-      });
-    }
+    const current = user.interests || [];
+    updateUser({
+      interests: current.includes(interest)
+        ? current.filter((item) => item !== interest)
+        : [...current, interest],
+    });
   };
 
-  const handleSave = () => {
-    setIsEditModalVisible(false);
-    setInterestSearchQuery(''); // Clear search when closing
-    setExpandedCategories({}); // Reset expanded categories
-  };
-
-  const handleProfileEditOpen = () => {
-    setProfileFormData({
+  const openEditSheet = () => {
+    setEditForm({
       name: user.name || '',
       hometown: user.hometown || '',
       college: user.college || '',
-      age: user.age ? user.age.toString() : '',
+      age: user.age ? String(user.age) : '',
     });
-    setIsProfileEditModalVisible(true);
+    setEditSheetOpen(true);
   };
 
-  const handleProfileSave = () => {
+  const saveProfile = () => {
     updateUser({
-      name: profileFormData.name || user.name,
-      hometown: profileFormData.hometown || user.hometown,
-      college: profileFormData.college || user.college,
-      age: profileFormData.age ? parseInt(profileFormData.age) || user.age : user.age,
+      name: editForm.name.trim() || user.name,
+      hometown: editForm.hometown.trim() || user.hometown,
+      college: editForm.college.trim() || user.college,
+      age: editForm.age ? parseInt(editForm.age, 10) || user.age : user.age,
     });
-    setIsProfileEditModalVisible(false);
+    setEditSheetOpen(false);
   };
 
-  const handleCitySelect = (cityName) => {
-    setResidence(cityName);
-    setIsResidenceSelectorVisible(false);
-    setCitySearchQuery('');
+  const confirmRemoveFriend = (friend) => {
+    Alert.alert('Remove friend', `Remove ${friend.name} from your friends?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeFriend(friend.id) },
+    ]);
   };
 
-  const getFilteredUsers = () => {
-    if (!friendSearchQuery || !friendSearchQuery.trim()) {
-      return ALL_USERS;
-    }
-    const searchQuery = friendSearchQuery.toLowerCase();
-    return ALL_USERS.filter((user) =>
-      user.name.toLowerCase().includes(searchQuery)
-    );
-  };
+  const goToAddFriends = () => navigation.navigate('FriendRequests', { tab: 'discover' });
 
-  const handleFriendToggle = (userId) => {
-    if (isFriend(userId)) {
-      removeFriend(userId);
-    } else {
-      addFriend(userId);
-    }
-  };
+  const infoRows = [
+    user.hometown && { icon: '📍', label: 'Hometown', value: user.hometown },
+    user.college && { icon: '🎓', label: 'College', value: user.college },
+    user.age && { icon: '📅', label: 'Grad year', value: String(user.age) },
+  ].filter(Boolean);
 
-  const handleFriendPress = (userId) => {
-    navigation.navigate('FriendProfile', { userId });
-  };
+  const rowDivider = (
+    <View
+      style={{
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: colors.border,
+        marginLeft: spacing.md * 2 + 48,
+      }}
+    />
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
+    <Screen>
+      {/* Identity */}
+      <View
+        style={[
+          styles.identity,
+          {
+            backgroundColor: colors.background,
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.md,
+            paddingBottom: spacing.lg,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.border,
+          },
+        ]}
       >
-        {/* Profile Photo */}
-        <View style={styles.photoSection}>
-          <View style={[styles.photoContainer, { backgroundColor: colors.primary }]}>
-            {user.photo ? (
-              <Image source={{ uri: user.photo }} style={styles.photo} />
-            ) : (
-              <Text style={styles.photoPlaceholder}>
-                {user.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Name */}
-        <View style={styles.nameSection}>
-          <View style={styles.nameAndResidence}>
-            <Text style={[styles.name, { color: colors.textPrimary }]}>{user.name}</Text>
-            <TouchableOpacity 
-              onPress={() => setIsResidenceSelectorVisible(true)}
-              style={styles.residenceButton}
-            >
-              <Text style={[styles.residenceButtonText, { color: colors.textSecondary }]}>
-                {user.residence || 'Set residence'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            onPress={handleProfileEditOpen}
-            style={[styles.topEditButton, { backgroundColor: colors.primary }]}
-          >
-            <Text style={styles.topEditButtonIcon}>✏️</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Basic Info */}
-        <View style={styles.infoSection}>
-          {user.hometown && (
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📍 Hometown</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user.hometown}</Text>
-            </View>
-          )}
-
-          {user.college && (
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🎓 College</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user.college}</Text>
-            </View>
-          )}
-
-          {user.age && (
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Grad Year</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user.age}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Interests */}
-        <View style={styles.interestsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Interests</Text>
+        <View style={styles.identityRow}>
+          <Avatar name={user.name} uri={user.photo} size="lg" />
+          <View style={[styles.identityText, { marginLeft: spacing.lg }]}>
+            <Text style={[typography.title, { color: colors.textPrimary }]} numberOfLines={1}>
+              {user.name}
+            </Text>
             <TouchableOpacity
-              onPress={() => setIsEditModalVisible(true)}
-              style={[styles.editButton, { backgroundColor: colors.primary }]}
+              onPress={() => setCitySheetOpen(true)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Change residence"
             >
-              <Text style={styles.editButtonIcon}>✏️</Text>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 3 }]}>
+                📍 {user.residence || 'Set residence'} ›
+              </Text>
             </TouchableOpacity>
           </View>
-          {user.interests && user.interests.length > 0 ? (
-            <View style={styles.interestsContainer}>
-              {user.interests.map((interest, index) => (
+          <Button label="Edit" variant="secondary" size="sm" onPress={openEditSheet} />
+        </View>
+
+        <View style={[styles.identityActions, { marginTop: spacing.lg, gap: spacing.sm }]}>
+          <Button label="＋  Add friends" onPress={goToAddFriends} style={{ flex: 1 }} />
+          <Button
+            label="Invite contacts"
+            variant="secondary"
+            onPress={() => navigation.navigate('InviteContacts')}
+            style={{ flex: 1 }}
+          />
+        </View>
+
+        <SegmentedControl
+          style={{ marginTop: spacing.md }}
+          value={activeTab}
+          onChange={setActiveTab}
+          segments={[
+            { key: 'profile', label: 'Profile' },
+            { key: 'friends', label: 'Friends', badge: pendingRequestCount || undefined },
+          ]}
+        />
+      </View>
+
+      {activeTab === 'profile' ? (
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxxl }}
+          showsVerticalScrollIndicator={false}
+        >
+          {infoRows.length > 0 ? (
+            <Card>
+              {infoRows.map((row, index) => (
                 <View
-                  key={index}
+                  key={row.label}
                   style={[
-                    styles.interestTag,
-                    { backgroundColor: 'rgba(20, 184, 166, 0.15)' },
+                    styles.infoRow,
+                    index > 0 && {
+                      borderTopWidth: StyleSheet.hairlineWidth,
+                      borderTopColor: colors.border,
+                      marginTop: spacing.md,
+                      paddingTop: spacing.md,
+                    },
                   ]}
                 >
-                  <Text style={[styles.interestText, { color: colors.primary }]}>{interest}</Text>
+                  <Text style={[typography.body, { color: colors.textSecondary }]}>
+                    {row.icon}  {row.label}
+                  </Text>
+                  <Text
+                    style={[typography.body, { color: colors.textPrimary, fontWeight: '600', flexShrink: 1 }]}
+                    numberOfLines={1}
+                  >
+                    {row.value}
+                  </Text>
                 </View>
               ))}
+            </Card>
+          ) : null}
+
+          <Card style={{ marginTop: spacing.lg }}>
+            <View style={styles.cardHeader}>
+              <Text style={[typography.heading, { color: colors.textPrimary }]}>Interests</Text>
+              <Button label="Edit" variant="ghost" size="sm" onPress={() => setInterestsSheetOpen(true)} />
             </View>
-          ) : (
-            <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
-              No Interests Selected Yet!
-            </Text>
-          )}
-        </View>
-
-        {/* My Friends */}
-        <View style={[styles.interestsSection, styles.friendsSection]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>My Friends</Text>
-            <TouchableOpacity
-              onPress={() => setIsFriendsModalVisible(true)}
-              style={[styles.editButton, { backgroundColor: colors.primary }]}
-            >
-              <Text style={styles.editButtonIcon}>+</Text>
-            </TouchableOpacity>
-          </View>
-          {friends && friends.length > 0 ? (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.friendsContainer}
-            >
-              {friends.map((friendId) => {
-                const friend = USERS_BY_ID.get(friendId);
-                if (!friend) return null;
-                return (
-                  <View
-                    key={friendId}
-                    style={[
-                      styles.friendItem,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={styles.friendItemContent}
-                      onPress={() => handleFriendPress(friendId)}
-                    >
-                      <View style={[styles.friendAvatar, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.friendAvatarText}>
-                          {friend.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
-                        </Text>
-                      </View>
-                      <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {friend.name.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Alert.alert(
-                          'Remove Friend',
-                          `Are you sure you want to remove ${friend.name} as a friend?`,
-                          [
-                            {
-                              text: 'Cancel',
-                              style: 'cancel',
-                            },
-                            {
-                              text: 'Remove',
-                              style: 'destructive',
-                              onPress: () => removeFriend(friendId),
-                            },
-                          ]
-                        );
-                      }}
-                      style={styles.removeFriendButton}
-                    >
-                      <Text style={[styles.removeFriendButtonText, { color: colors.error }]}>
-                        ✕
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
-              No friends yet. Tap + to add friends!
-            </Text>
-          )}
-        </View>
-
-        {/* Edit Interests Modal */}
-        <Modal
-          visible={isEditModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsEditModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select Interests</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setIsEditModalVisible(false);
-                    setInterestSearchQuery('');
-                    setExpandedCategories({});
-                  }}
-                  style={styles.closeButton}
-                >
-                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.searchContainer}>
-                <TextInput
-                  style={[
-                    styles.searchInput,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="Search interests..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={interestSearchQuery}
-                  onChangeText={setInterestSearchQuery}
-                />
-              </View>
-              <ScrollView 
-                style={styles.modalBody} 
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={styles.modalBodyContent}
-              >
-                {interestSearchQuery ? (
-                  // Search mode: show flat list
-                  <View style={styles.interestsGrid}>
-                    {filteredInterests.map((interest) => {
-                      const isSelected = user.interests?.includes(interest);
-                      return (
-                        <TouchableOpacity
-                          key={interest}
-                          style={[
-                            styles.interestTagSmall,
-                            {
-                              backgroundColor: isSelected
-                                ? 'rgba(20, 184, 166, 0.15)'
-                                : colors.backgroundSecondary,
-                              borderColor: isSelected ? colors.primary : colors.border,
-                            },
-                          ]}
-                          onPress={() => toggleInterest(interest)}
-                        >
-                          <Text
-                            style={[
-                              styles.interestTagTextSmall,
-                              {
-                                color: isSelected ? colors.primary : colors.textPrimary,
-                                fontWeight: isSelected ? '600' : '400',
-                              },
-                            ]}
-                          >
-                            {interest}
-                          </Text>
-                          {isSelected && (
-                            <Text style={[styles.checkmarkSmall, { color: colors.primary }]}>✓</Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  // Category mode: show categorized
-                  Object.keys(filteredCategories).map((categoryName) => {
-                    const isExpanded = expandedCategories[categoryName];
-                    const interests = filteredCategories[categoryName];
-                    const categoryIcon = CATEGORY_ICONS[categoryName] || '📌';
-                    
-                    return (
-                      <View key={categoryName} style={styles.categorySection}>
-                        <TouchableOpacity
-                          style={styles.categoryHeader}
-                          onPress={() => toggleCategory(categoryName)}
-                        >
-                          <View style={styles.categoryTitleContainer}>
-                            <Text style={styles.categoryIcon}>{categoryIcon}</Text>
-                            <Text style={[styles.categoryTitle, { color: colors.textPrimary }]}>
-                              {categoryName}
-                            </Text>
-                          </View>
-                          <Text style={[styles.dropdownArrow, { color: colors.textSecondary }]}>
-                            {isExpanded ? '▼' : '▶'}
-                          </Text>
-                        </TouchableOpacity>
-                        {isExpanded && (
-                          <View style={styles.interestsGrid}>
-                            {interests.map((interest) => {
-                              const isSelected = user.interests?.includes(interest);
-                              return (
-                                <TouchableOpacity
-                                  key={interest}
-                                  style={[
-                                    styles.interestTagSmall,
-                                    {
-                                      backgroundColor: isSelected
-                                        ? 'rgba(20, 184, 166, 0.15)'
-                                        : colors.backgroundSecondary,
-                                      borderColor: isSelected ? colors.primary : colors.border,
-                                    },
-                                  ]}
-                                  onPress={() => toggleInterest(interest)}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.interestTagTextSmall,
-                                      {
-                                        color: isSelected ? colors.primary : colors.textPrimary,
-                                        fontWeight: isSelected ? '600' : '400',
-                                      },
-                                    ]}
-                                  >
-                                    {interest}
-                                  </Text>
-                                  {isSelected && (
-                                    <Text style={[styles.checkmarkSmall, { color: colors.primary }]}>✓</Text>
-                                  )}
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })
-                )}
-              </ScrollView>
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[styles.saveButton, { backgroundColor: colors.primary }]}
-                  onPress={handleSave}
-                >
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* City Selector Modal */}
-        <Modal
-          visible={isResidenceSelectorVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => {
-            setIsResidenceSelectorVisible(false);
-            setCitySearchQuery('');
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select City</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setIsResidenceSelectorVisible(false);
-                    setCitySearchQuery('');
-                  }}
-                  style={styles.closeButton}
-                >
-                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.searchContainer}>
-                <TextInput
-                  style={[
-                    styles.searchInput,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="Search cities..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={citySearchQuery}
-                  onChangeText={setCitySearchQuery}
-                  autoFocus={true}
-                />
-              </View>
-              <ScrollView 
-                style={styles.modalBody} 
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={styles.modalBodyContent}
-              >
-                {getFilteredCities().map((city) => (
-                  <TouchableOpacity
-                    key={city.name}
-                    style={[
-                      styles.cityItem,
-                      {
-                        backgroundColor: user.residence === city.name
-                          ? 'rgba(20, 184, 166, 0.15)'
-                          : colors.backgroundSecondary,
-                        borderColor: user.residence === city.name
-                          ? colors.primary
-                          : colors.border,
-                      },
-                    ]}
-                    onPress={() => handleCitySelect(city.name)}
-                  >
-                    <Text style={[
-                      styles.cityItemText,
-                      { 
-                        color: user.residence === city.name 
-                          ? colors.primary 
-                          : colors.textPrimary,
-                        fontWeight: user.residence === city.name ? '700' : '400',
-                      },
-                    ]}>
-                      {city.name}
-                    </Text>
-                    {user.residence === city.name && (
-                      <Text style={[styles.cityItemCheck, { color: colors.primary }]}>✓</Text>
-                    )}
-                  </TouchableOpacity>
+            {user.interests?.length > 0 ? (
+              <View style={[styles.chipWrap, { marginTop: spacing.md }]}>
+                {user.interests.map((interest) => (
+                  <Chip key={interest} label={interest} selected />
                 ))}
-                {getFilteredCities().length === 0 && (
-                  <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
-                    No cities found
-                  </Text>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Add Friends Modal */}
-        <Modal
-          visible={isFriendsModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => {
-            setIsFriendsModalVisible(false);
-            setFriendSearchQuery('');
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Friends</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setIsFriendsModalVisible(false);
-                    setFriendSearchQuery('');
-                  }}
-                  style={styles.closeButton}
-                >
-                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
-                </TouchableOpacity>
               </View>
-              <View style={styles.searchContainer}>
-                <TextInput
+            ) : (
+              <Text style={[typography.body, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                No interests yet — tap Edit to pick a few.
+              </Text>
+            )}
+          </Card>
+
+          <Card style={{ marginTop: spacing.lg }}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.heading, { color: colors.textPrimary }]}>Dark mode</Text>
+                <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                  {isDarkMode ? 'On' : 'Off'}
+                </Text>
+              </View>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleDarkMode}
+                trackColor={{ true: colors.primary, false: colors.borderStrong }}
+                thumbColor={colors.card}
+              />
+            </View>
+          </Card>
+        </ScrollView>
+      ) : (
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxxl }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.statRow, { gap: spacing.md }]}>
+            <StatTile value={stats.directCount} label="Friends" emphasis />
+            <StatTile value={stats.secondDegreeCount} label="Friends of friends" />
+            <StatTile value={stats.totalReach} label="Total reach" />
+          </View>
+
+          <Card style={{ marginTop: spacing.lg }}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.heading, { color: colors.textPrimary }]}>
+                  {focusedFriend ? focusedFriend.name : 'Your web'}
+                </Text>
+                <Text
+                  style={[typography.caption, { color: colors.textSecondary, marginTop: 2, lineHeight: 18 }]}
+                >
+                  {focusedFriend
+                    ? `${focusedPeerCount} ${
+                        focusedPeerCount === 1 ? 'connection' : 'connections'
+                      }${focusedPeerCount > 10 ? ' · showing 10' : ''} · tap a circle to open a profile`
+                    : `${stats.directCount} direct ${
+                        stats.directCount === 1 ? 'friend' : 'friends'
+                      } connect you to ${stats.secondDegreeCount} more people across ${
+                        stats.cityCount
+                      } ${stats.cityCount === 1 ? 'city' : 'cities'}.`}
+                </Text>
+              </View>
+
+              {focusedFriend ? (
+                <Button label="Back" variant="secondary" size="sm" onPress={() => setFocusedFriendId(null)} />
+              ) : webCity !== 'all' ? (
+                // Total in the highlighted city; opens the full list.
+                <TouchableOpacity
+                  onPress={() => setCitySheetPeopleOpen(true)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show all ${cityPeople.length} people in ${webCity}`}
                   style={[
-                    styles.searchInput,
+                    styles.countPill,
                     {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
+                      backgroundColor: colors.primary,
+                      borderRadius: radius.pill,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.sm - 2,
                     },
                   ]}
-                  placeholder="Search users..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={friendSearchQuery}
-                  onChangeText={setFriendSearchQuery}
-                  autoFocus={true}
+                >
+                  <Text style={[typography.label, { color: colors.onPrimary }]}>
+                    {cityPeople.length}
+                  </Text>
+                  <Text style={[typography.caption, { color: colors.onPrimary, fontSize: 11 }]}>
+                    in {webCity} ›
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {!focusedFriend && webCities.length > 1 ? (
+              <View style={[styles.chipWrap, { marginTop: spacing.md }]}>
+                <Chip
+                  label="All"
+                  selected={webCity === 'all'}
+                  onPress={() => selectWebCity('all')}
+                />
+                {webCities.map(({ city, count }) => (
+                  <Chip
+                    key={city}
+                    label={`${city} · ${count}`}
+                    selected={webCity === city}
+                    onPress={() => selectWebCity(city)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {webFriends.length > 0 ? (
+              <ConnectionWeb
+                friends={webFriends}
+                size={286}
+                focusedFriendId={focusedFriendId}
+                highlightedIds={highlightedIds}
+                onFocusFriend={setFocusedFriendId}
+                onOpenProfile={(userId) => navigation.navigate('FriendProfile', { userId })}
+              />
+            ) : (
+              <EmptyState
+                icon="🕸️"
+                title="No connections yet"
+                message="Add a few friends and your web will fill in here."
+                actionLabel="Add friends"
+                onAction={goToAddFriends}
+              />
+            )}
+
+            {focusedFriend ? (
+              <View style={[styles.webActions, { marginTop: spacing.sm, gap: spacing.sm }]}>
+                <Button
+                  label="View profile"
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => navigation.navigate('FriendProfile', { userId: focusedFriend.id })}
+                />
+                <Button
+                  label="Message"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => openDirectMessage(focusedFriend.id)}
                 />
               </View>
-              <ScrollView 
-                style={styles.modalBody} 
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={styles.modalBodyContent}
-              >
-                {getFilteredUsers().map((user) => {
-                  const isAlreadyFriend = isFriend(user.id);
-                  return (
-                    <TouchableOpacity
-                      key={user.id}
-                      style={[
-                        styles.modalFriendItem,
-                        {
-                          backgroundColor: isAlreadyFriend
-                            ? 'rgba(20, 184, 166, 0.15)'
-                            : colors.backgroundSecondary,
-                          borderColor: isAlreadyFriend
-                            ? colors.primary
-                            : colors.border,
-                        },
-                      ]}
-                      onPress={() => handleFriendToggle(user.id)}
-                    >
-                      <View style={[styles.modalFriendAvatar, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.modalFriendAvatarText}>
-                          {user.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
-                        </Text>
-                      </View>
-                      <View style={styles.modalFriendInfo}>
-                        <Text style={[
-                          styles.modalFriendName,
-                          { 
-                            color: isAlreadyFriend 
-                              ? colors.primary 
-                              : colors.textPrimary,
-                            fontWeight: isAlreadyFriend ? '700' : '400',
-                          },
-                        ]}>
-                          {user.name}
-                        </Text>
-                        <Text style={[styles.modalFriendCity, { color: colors.textSecondary }]}>
-                          {user.city}
-                        </Text>
-                      </View>
-                      {isAlreadyFriend && (
-                        <Text style={[styles.cityItemCheck, { color: colors.primary }]}>✓</Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-                {getFilteredUsers().length === 0 && (
-                  <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
-                    No users found
+            ) : (
+              <View style={[styles.legend, { marginTop: spacing.sm, gap: spacing.lg }]}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                    {webCity === 'all' ? 'Friends · tap to zoom' : `In ${webCity}`}
                   </Text>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: colors.textTertiary }]} />
+                  <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                    {webCity === 'all' ? 'Friends of friends' : 'Elsewhere'}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </Card>
 
-        {/* Edit Profile Info Modal */}
-        <Modal
-          visible={isProfileEditModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsProfileEditModalVisible(false)}
+          <Card style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate('FriendRequests')}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.heading, { color: colors.textPrimary }]}>Friend requests</Text>
+                <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                  {pendingRequestCount > 0
+                    ? `${pendingRequestCount} waiting on you`
+                    : 'Find people and send requests'}
+                </Text>
+              </View>
+              {pendingRequestCount > 0 ? (
+                <View style={[styles.badge, { backgroundColor: colors.primary, borderRadius: radius.pill }]}>
+                  <Text style={[typography.caption, { color: colors.onPrimary, fontWeight: '700' }]}>
+                    {pendingRequestCount}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[typography.body, { color: colors.textTertiary }]}>›</Text>
+              )}
+            </View>
+          </Card>
+
+          <View style={[styles.cardHeader, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>
+            <Text style={[typography.heading, { color: colors.textPrimary }]}>
+              Friends · {friendRows.length}
+            </Text>
+            <Button label="Add friends" variant="ghost" size="sm" onPress={goToAddFriends} />
+          </View>
+
+          {friendRows.length > 0 ? (
+            <Card padded={false} style={{ paddingVertical: spacing.xs }}>
+              {friendRows.map((friend, index) => (
+                <View key={friend.id}>
+                  {index > 0 ? rowDivider : null}
+                  <PersonRow
+                    name={friend.name}
+                    subtitle={friend.city}
+                    meta={
+                      friend.mutualCount > 0
+                        ? `${friend.mutualCount} mutual ${friend.mutualCount === 1 ? 'friend' : 'friends'}`
+                        : undefined
+                    }
+                    onPress={() => navigation.navigate('FriendProfile', { userId: friend.id })}
+                    onMessage={() => openDirectMessage(friend.id)}
+                    right={
+                      <TouchableOpacity
+                        onPress={() => confirmRemoveFriend(friend)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${friend.name}`}
+                      >
+                        <Text style={[typography.caption, { color: colors.textTertiary }]}>Remove</Text>
+                      </TouchableOpacity>
+                    }
+                  />
+                </View>
+              ))}
+            </Card>
+          ) : (
+            <Card>
+              <EmptyState
+                icon="👋"
+                title="No friends yet"
+                message="Send a few requests to start building your web."
+                actionLabel="Add friends"
+                onAction={goToAddFriends}
+              />
+            </Card>
+          )}
+        </ScrollView>
+      )}
+
+      {/* People in the highlighted city */}
+      <BottomSheet
+        visible={citySheetPeopleOpen}
+        onClose={() => setCitySheetPeopleOpen(false)}
+        title={`${webCity} · ${cityPeople.length} ${cityPeople.length === 1 ? 'person' : 'people'}`}
+        subtitle="Everyone in your network who lives here"
+      >
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+          <View style={styles.chipWrap}>
+            {[
+              { key: 'all', label: `All · ${cityPeople.length}` },
+              {
+                key: 'friends',
+                label: `Friends · ${cityPeople.filter((p) => p.degree === 1).length}`,
+              },
+              {
+                key: 'fof',
+                label: `Friends of friends · ${cityPeople.filter((p) => p.degree === 2).length}`,
+              },
+            ].map((option) => (
+              <Chip
+                key={option.key}
+                label={option.label}
+                selected={peopleDegreeFilter === option.key}
+                onPress={() => setPeopleDegreeFilter(option.key)}
+              />
+            ))}
+          </View>
+
+          {cityInterestOptions.length > 0 ? (
+            <>
+              <Text
+                style={[
+                  typography.caption,
+                  { color: colors.textTertiary, marginTop: spacing.md, marginBottom: spacing.sm },
+                ]}
+              >
+                Filter by interest
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[styles.chipWrap, { paddingRight: spacing.xl }]}>
+                  {cityInterestOptions.map((interest) => (
+                    <Chip
+                      key={interest}
+                      label={interest}
+                      selected={peopleInterestFilters.includes(interest)}
+                      onPress={() =>
+                        setPeopleInterestFilters((prev) =>
+                          prev.includes(interest)
+                            ? prev.filter((item) => item !== interest)
+                            : [...prev, interest]
+                        )
+                      }
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          ) : null}
+        </View>
+
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Edit Profile</Text>
-                <TouchableOpacity
-                  onPress={() => setIsProfileEditModalVisible(false)}
-                  style={styles.closeButton}
-                >
-                  <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
-                </TouchableOpacity>
+          {filteredCityPeople.length === 0 ? (
+            <EmptyState
+              icon="🔍"
+              title="Nobody matches"
+              message="Try clearing a filter."
+              actionLabel="Clear filters"
+              onAction={() => {
+                setPeopleInterestFilters([]);
+                setPeopleDegreeFilter('all');
+              }}
+            />
+          ) : (
+            filteredCityPeople.map(({ user: person, degree, connectors, mutualCount }, index) => (
+              <View key={person.id}>
+                {index > 0 ? rowDivider : null}
+                <PersonRow
+                  name={person.name}
+                  subtitle={(person.interests || []).slice(0, 3).join(' · ')}
+                  meta={
+                    degree === 1
+                      ? `Friend${mutualCount > 0 ? ` · ${mutualCount} mutual` : ''}`
+                      : undefined
+                  }
+                  connectors={connectors}
+                  onPress={() => {
+                    setCitySheetPeopleOpen(false);
+                    navigation.navigate('FriendProfile', { userId: person.id });
+                  }}
+                  onMessage={() => {
+                    setCitySheetPeopleOpen(false);
+                    openDirectMessage(person.id);
+                  }}
+                />
               </View>
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Name</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                    placeholder="e.g., Alex Johnson"
-                    placeholderTextColor={colors.textTertiary}
-                    value={profileFormData.name}
-                    onChangeText={(text) => setProfileFormData({ ...profileFormData, name: text })}
-                  />
-                </View>
+            ))
+          )}
+        </ScrollView>
+      </BottomSheet>
 
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>📍 Hometown</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                    placeholder="e.g., San Francisco, CA"
-                    placeholderTextColor={colors.textTertiary}
-                    value={profileFormData.hometown}
-                    onChangeText={(text) => setProfileFormData({ ...profileFormData, hometown: text })}
-                  />
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>🎓 College</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                    placeholder="e.g., Stanford University"
-                    placeholderTextColor={colors.textTertiary}
-                    value={profileFormData.college}
-                    onChangeText={(text) => setProfileFormData({ ...profileFormData, college: text })}
-                  />
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>📅 Grad Year</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                    placeholder="e.g., 2024"
-                    placeholderTextColor={colors.textTertiary}
-                    value={profileFormData.age}
-                    onChangeText={(text) => setProfileFormData({ ...profileFormData, age: text })}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </ScrollView>
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[styles.saveButton, { backgroundColor: colors.primary }]}
-                  onPress={handleProfileSave}
-                >
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Interests editor */}
+      <BottomSheet
+        visible={interestsSheetOpen}
+        onClose={() => {
+          setInterestsSheetOpen(false);
+          setInterestQuery('');
+          setExpandedCategories({});
+        }}
+        title="Interests"
+        subtitle={`${user.interests?.length || 0} selected`}
+        footer={
+          <Button
+            label="Done"
+            fullWidth
+            onPress={() => {
+              setInterestsSheetOpen(false);
+              setInterestQuery('');
+              setExpandedCategories({});
+            }}
+          />
+        }
+      >
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+          <SearchInput value={interestQuery} onChangeText={setInterestQuery} placeholder="Search interests" />
+        </View>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.md }}
+        >
+          {interestSearchResults ? (
+            <View style={styles.chipWrap}>
+              {interestSearchResults.map((interest) => (
+                <Chip
+                  key={interest}
+                  label={interest}
+                  selected={user.interests?.includes(interest)}
+                  onPress={() => toggleInterest(interest)}
+                />
+              ))}
+              {interestSearchResults.length === 0 ? (
+                <Text style={[typography.body, { color: colors.textSecondary }]}>
+                  No interests match “{interestQuery}”.
+                </Text>
+              ) : null}
             </View>
-          </View>
-        </Modal>
+          ) : (
+            Object.keys(INTERESTS_BY_CATEGORY).map((category) => {
+              const expanded = expandedCategories[category];
+              return (
+                <View key={category} style={{ marginBottom: spacing.md }}>
+                  <TouchableOpacity
+                    style={styles.categoryHeader}
+                    onPress={() =>
+                      setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !!expanded }}
+                  >
+                    <Text style={[typography.body, { color: colors.textPrimary, fontWeight: '600' }]}>
+                      {CATEGORY_ICONS[category] || '📌'}  {category}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                      {expanded ? '▾' : '▸'}
+                    </Text>
+                  </TouchableOpacity>
+                  {expanded ? (
+                    <View style={[styles.chipWrap, { marginTop: spacing.sm }]}>
+                      {INTERESTS_BY_CATEGORY[category].map((interest) => (
+                        <Chip
+                          key={interest}
+                          label={interest}
+                          selected={user.interests?.includes(interest)}
+                          onPress={() => toggleInterest(interest)}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      </BottomSheet>
 
+      {/* Residence picker */}
+      <BottomSheet
+        visible={citySheetOpen}
+        onClose={() => {
+          setCitySheetOpen(false);
+          setCityQuery('');
+        }}
+        title="Where do you live?"
+        subtitle="Events and people are shown for this city"
+      >
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+          <SearchInput value={cityQuery} onChangeText={setCityQuery} placeholder="Search cities" />
+        </View>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.md }}
+        >
+          {filteredCities.map((city) => {
+            const selected = user.residence === city.name;
+            return (
+              <TouchableOpacity
+                key={city.name}
+                onPress={() => {
+                  setResidence(city.name);
+                  setCitySheetOpen(false);
+                  setCityQuery('');
+                }}
+                style={[
+                  styles.cityRow,
+                  {
+                    borderRadius: radius.md,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: selected ? colors.primaryMuted : 'transparent',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    typography.body,
+                    {
+                      color: selected ? colors.primary : colors.textPrimary,
+                      fontWeight: selected ? '700' : '500',
+                    },
+                  ]}
+                >
+                  {city.name}
+                </Text>
+                {selected ? <Text style={[typography.body, { color: colors.primary }]}>✓</Text> : null}
+              </TouchableOpacity>
+            );
+          })}
+          {filteredCities.length === 0 ? (
+            <Text style={[typography.body, { color: colors.textSecondary }]}>No cities found.</Text>
+          ) : null}
+        </ScrollView>
+      </BottomSheet>
 
-      </ScrollView>
-    </View>
+      {/* Profile editor */}
+      <BottomSheet
+        visible={editSheetOpen}
+        onClose={() => setEditSheetOpen(false)}
+        title="Edit profile"
+        footer={<Button label="Save" fullWidth onPress={saveProfile} />}
+      >
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={{ padding: spacing.xl }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {[
+            { key: 'name', label: 'Name', placeholder: 'Alex Johnson' },
+            { key: 'hometown', label: '📍 Hometown', placeholder: 'San Francisco, CA' },
+            { key: 'college', label: '🎓 College', placeholder: 'Dartmouth College' },
+            { key: 'age', label: '📅 Grad year', placeholder: '2026', numeric: true },
+          ].map((field) => (
+            <View key={field.key} style={{ marginBottom: spacing.lg }}>
+              <Text style={[typography.label, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
+                {field.label}
+              </Text>
+              <TextInput
+                style={[
+                  typography.body,
+                  styles.input,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                    borderRadius: radius.md,
+                  },
+                ]}
+                placeholder={field.placeholder}
+                placeholderTextColor={colors.textTertiary}
+                value={editForm[field.key]}
+                onChangeText={(text) => setEditForm((prev) => ({ ...prev, [field.key]: text }))}
+                keyboardType={field.numeric ? 'number-pad' : 'default'}
+              />
+            </View>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 60,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  photoSection: {
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-  photoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#14b8a6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  photo: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  photoPlaceholder: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
-  nameSection: {
+  identity: {
     width: '100%',
-    paddingHorizontal: 24,
+  },
+  identityRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 32,
   },
-  nameAndResidence: {
+  identityText: {
     flex: 1,
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    minWidth: 0,
   },
-  name: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: -0.5,
-    marginBottom: 4,
+  identityActions: {
+    flexDirection: 'row',
   },
-  residenceButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 0,
-  },
-  residenceButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  topEditButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#14b8a6',
-    marginLeft: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topEditButtonIcon: {
-    fontSize: 18,
-  },
-  infoSection: {
-    width: '100%',
-    paddingHorizontal: 24,
-    marginBottom: 32,
+  body: {
+    flex: 1,
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  infoLabel: {
-    fontSize: 16,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 16,
-    color: '#0f172a',
-    fontWeight: '600',
-  },
-  interestsSection: {
-    width: '100%',
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  friendsSection: {
-    marginTop: 16,
-  },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: -0.3,
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editButtonIcon: {
-    fontSize: 18,
-  },
-  interestsContainer: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  interestTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0fdfa',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  interestText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#14b8a6',
-  },
-  noInterestsText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  friendsContainer: {
+  statRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingRight: 20,
   },
-  friendItem: {
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    minWidth: 70,
-    maxWidth: 80,
-    position: 'relative',
-  },
-  friendAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#14b8a6',
+  legend: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
   },
-  friendAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  friendName: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#0f172a',
-    textAlign: 'center',
-  },
-  friendItemContent: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  removeFriendButton: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeFriendButtonText: {
-    fontSize: 10,
-    color: '#ef4444',
-    fontWeight: '700',
-  },
-  modalFriendItem: {
+  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 8,
+    gap: 6,
   },
-  modalFriendAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  modalFriendAvatarText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  modalFriendInfo: {
-    flex: 1,
-  },
-  modalFriendName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 2,
-  },
-  modalFriendCity: {
-    fontSize: 11,
-    color: '#64748b',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingBottom: 20,
-    flexDirection: 'column',
-  },
-  modalHeader: {
+  webActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+  },
+  countPill: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    marginLeft: 12,
   },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
+  badge: {
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 7,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#64748b',
-  },
-  modalBody: {
-    paddingHorizontal: 24,
-    maxHeight: 400,
-  },
-  modalBodyContent: {
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  modalBodyContent: {
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  interestOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    backgroundColor: '#f8fafc',
-  },
-  interestOptionText: {
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#14b8a6',
-  },
-  modalFooter: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  saveButton: {
-    backgroundColor: '#14b8a6',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  searchContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  searchInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  categorySection: {
-    marginBottom: 16,
+  sheetScroll: {
+    flexGrow: 0,
   },
   categoryHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingVertical: 8,
   },
-  categoryTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryIcon: {
-    fontSize: 20,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  dropdownArrow: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  interestsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingTop: 8,
-    gap: 6,
-  },
-  interestTagSmall: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginRight: 6,
-    marginBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  interestTagTextSmall: {
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  checkmarkSmall: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  cityItem: {
+  cityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  cityItemText: {
-    fontSize: 16,
-    flex: 1,
-  },
-  cityItemCheck: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginLeft: 12,
-  },
-  noResultsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    paddingVertical: 40,
   },
   input: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
 });

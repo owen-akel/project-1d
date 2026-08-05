@@ -1,362 +1,242 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
+import { useFriends } from '../context/FriendsContext';
 import { USERS_BY_ID } from '../src/mock/users';
 import { FRIENDS_BY_USER_ID } from '../src/mock/graph';
-import { useFriends } from '../context/FriendsContext';
-
-// Helper to check if a user can be viewed
-// Main users are only visible if they're in the friends list
-// Friend users (e.g., "rod-friend-5") are only visible if their parent main user is in friends list
-function canViewUser(targetUserId, currentUserFriends) {
-  // Main users are only visible if they're in the friends list
-  if (targetUserId.startsWith('main-user-')) {
-    return currentUserFriends.includes(targetUserId);
-  }
-  
-  // Extract parent main user from friend ID (e.g., "rod-friend-5" -> "rod")
-  // Friend IDs follow pattern: "{firstName}-friend-{number}"
-  const parts = targetUserId.split('-');
-  if (parts.length >= 2 && parts[1] === 'friend') {
-    const firstName = parts[0];
-    // Find the main user with this first name
-    const mainUserIndex = [
-      'rod', 'sam', 'clay', 'harry', 'john', 'pete',
-      'liam', 'warren', 'jackson', 'eric', 'simon', 'greg'
-    ].indexOf(firstName);
-    
-    if (mainUserIndex !== -1) {
-      const parentMainUserId = `main-user-${mainUserIndex + 1}`;
-      // Only visible if parent main user is in friends list
-      return currentUserFriends.includes(parentMainUserId);
-    }
-  }
-  
-  // Default: not visible
-  return false;
-}
+import { canViewUser } from '../src/social/visibility';
+import { getMutualFriendCount, getConnectorFriends } from '../src/social/connections';
+import useOpenChat from '../src/hooks/useOpenChat';
+import {
+  Screen,
+  ScreenHeader,
+  Card,
+  Button,
+  Chip,
+  Avatar,
+  StatTile,
+  EmptyState,
+  PersonRow,
+} from '../src/ui';
 
 export default function FriendProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing, typography } = useTheme();
   const route = useRoute();
   const navigation = useNavigation();
-  const { friends } = useFriends();
+  const {
+    friends,
+    removeFriend,
+    sendFriendRequest,
+    cancelFriendRequest,
+    acceptFriendRequest,
+    incomingRequests,
+    getRelationship,
+  } = useFriends();
+
+  const { openDirectMessage } = useOpenChat();
+
   const { userId } = route.params || {};
-  
-  if (!userId) {
+  const person = userId ? USERS_BY_ID.get(userId) : null;
+
+  const relationship = getRelationship(userId);
+
+  const theirFriends = useMemo(() => {
+    if (!userId) return [];
+    return (FRIENDS_BY_USER_ID.get(userId) || [])
+      .filter((friendId) => canViewUser(friendId, friends))
+      .map((friendId) => USERS_BY_ID.get(friendId))
+      .filter(Boolean)
+      .map((friend) => ({ ...friend, connectors: getConnectorFriends(friend.id, friends) }));
+  }, [userId, friends]);
+
+  const mutualCount = useMemo(
+    () => (userId ? getMutualFriendCount(userId, friends) : 0),
+    [userId, friends]
+  );
+
+  // Which of your direct friends link you to this person (empty if they are one).
+  const connectors = useMemo(
+    () => (userId ? getConnectorFriends(userId, friends) : []),
+    [userId, friends]
+  );
+
+  const totalFriendCount = userId ? (FRIENDS_BY_USER_ID.get(userId) || []).length : 0;
+
+  if (!person) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-        <Text style={[styles.errorText, { color: colors.textPrimary }]}>User not found</Text>
-      </View>
+      <Screen>
+        <ScreenHeader title="Profile" onBack={() => navigation.goBack()} />
+        <EmptyState
+          icon="🤷"
+          title="User not found"
+          message="This profile is no longer available."
+        />
+      </Screen>
     );
   }
-  
-  const user = USERS_BY_ID.get(userId);
-  
-  if (!user) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-        <Text style={[styles.errorText, { color: colors.textPrimary }]}>User not found</Text>
-      </View>
-    );
-  }
-  
-  const userFriends = FRIENDS_BY_USER_ID.get(userId) || [];
-  const visibleFriends = userFriends.filter(friendId => canViewUser(friendId, friends));
-  
-  const handleFriendPress = (friendId) => {
-    navigation.push('FriendProfile', { userId: friendId });
+
+  const confirmRemove = () => {
+    Alert.alert('Remove friend', `Remove ${person.name} from your friends?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeFriend(userId) },
+    ]);
   };
-  
+
+  const renderAction = () => {
+    switch (relationship) {
+      case 'friend':
+        return <Button label="Friends ✓" variant="secondary" onPress={confirmRemove} fullWidth />;
+      case 'outgoing':
+        return (
+          <Button
+            label="Requested — tap to cancel"
+            variant="secondary"
+            onPress={() => cancelFriendRequest(userId)}
+            fullWidth
+          />
+        );
+      case 'incoming': {
+        const request = incomingRequests.find((item) => item.userId === userId);
+        return (
+          <Button
+            label="Accept request"
+            onPress={() => request && acceptFriendRequest(request.id)}
+            fullWidth
+          />
+        );
+      }
+      case 'self':
+        return null;
+      default:
+        return <Button label="Add friend" onPress={() => sendFriendRequest(userId)} fullWidth />;
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
+    <Screen>
+      <ScreenHeader title={person.name} subtitle={person.city} onBack={() => navigation.goBack()} />
+
       <ScrollView
-        style={styles.content}
+        style={styles.body}
+        contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxxl }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
       >
-        {/* Header with back button */}
-        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>← Back</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Profile Photo */}
-        <View style={styles.photoSection}>
-          <View style={[styles.photoContainer, { backgroundColor: colors.primary }]}>
-            <Text style={styles.photoPlaceholder}>
-              {user.name
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
+        <Card style={styles.identityCard}>
+          <Avatar name={person.name} size="xl" connectors={connectors} />
+          <Text style={[typography.title, { color: colors.textPrimary, marginTop: spacing.md }]}>
+            {person.name}
+          </Text>
+          <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+            📍 {person.city}
+            {mutualCount > 0
+              ? ` · ${mutualCount} mutual ${mutualCount === 1 ? 'friend' : 'friends'}`
+              : ''}
+          </Text>
+          {connectors.length > 0 ? (
+            <Text
+              style={[
+                typography.caption,
+                { color: colors.textTertiary, marginTop: 4, textAlign: 'center' },
+              ]}
+            >
+              Connected through {connectors.map((c) => c.name.split(' ')[0]).join(', ')}
             </Text>
+          ) : null}
+          <View style={[styles.identityActions, { width: '100%', marginTop: spacing.lg, gap: spacing.sm }]}>
+            <View style={{ flex: 1 }}>{renderAction()}</View>
+            <Button
+              label="💬  Message"
+              variant="secondary"
+              style={{ flex: 1 }}
+              onPress={() => openDirectMessage(userId)}
+            />
           </View>
+        </Card>
+
+        <View style={[styles.statRow, { gap: spacing.md, marginTop: spacing.lg }]}>
+          <StatTile value={totalFriendCount} label="Friends" />
+          <StatTile value={mutualCount} label="Mutual with you" emphasis={mutualCount > 0} />
+          <StatTile value={person.interests?.length || 0} label="Interests" />
         </View>
 
-        {/* Name */}
-        <View style={styles.nameSection}>
-          <Text style={[styles.name, { color: colors.textPrimary }]}>{user.name}</Text>
-        </View>
-
-        {/* Basic Info */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📍 City</Text>
-            <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user.city}</Text>
-          </View>
-        </View>
-
-        {/* Interests */}
-        <View style={styles.interestsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Interests</Text>
-          </View>
-          {user.interests && user.interests.length > 0 ? (
-            <View style={styles.interestsContainer}>
-              {user.interests.map((interest, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.interestTag,
-                    { backgroundColor: 'rgba(20, 184, 166, 0.15)' },
-                  ]}
-                >
-                  <Text style={[styles.interestText, { color: colors.primary }]}>{interest}</Text>
-                </View>
+        <Card style={{ marginTop: spacing.lg }}>
+          <Text style={[typography.heading, { color: colors.textPrimary }]}>Interests</Text>
+          {person.interests?.length > 0 ? (
+            <View style={[styles.chipWrap, { marginTop: spacing.md }]}>
+              {person.interests.map((interest) => (
+                <Chip key={interest} label={interest} />
               ))}
             </View>
           ) : (
-            <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
-              No interests listed
+            <Text style={[typography.body, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+              No interests listed.
             </Text>
           )}
-        </View>
+        </Card>
 
-        {/* Their Friends */}
-        <View style={styles.interestsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Their Friends</Text>
-          </View>
-          {visibleFriends.length > 0 ? (
-            <View style={styles.friendsContainer}>
-              {visibleFriends.map((friendId) => {
-                const friend = USERS_BY_ID.get(friendId);
-                if (!friend) return null;
-                return (
-                  <TouchableOpacity
-                    key={friendId}
-                    style={[
-                      styles.friendItem,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                    onPress={() => handleFriendPress(friendId)}
-                  >
-                    <View style={[styles.friendAvatar, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.friendAvatarText}>
-                        {friend.name
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')}
-                      </Text>
-                    </View>
-                    <View style={styles.friendInfo}>
-                      <Text style={[styles.friendName, { color: colors.textPrimary }]}>
-                        {friend.name}
-                      </Text>
-                      <Text style={[styles.friendCity, { color: colors.textSecondary }]}>
-                        {friend.city}
-                      </Text>
-                    </View>
-                    <Text style={[styles.arrowText, { color: colors.textTertiary }]}>→</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : (
-            <Text style={[styles.noInterestsText, { color: colors.textSecondary }]}>
-              {userFriends.length > 0 
-                ? 'You don\'t have access to view their friends. Add them as a friend to see their connections!'
-                : 'No friends listed'}
-            </Text>
-          )}
-        </View>
+        <Text
+          style={[
+            typography.heading,
+            { color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.sm },
+          ]}
+        >
+          Their connections you can see · {theirFriends.length}
+        </Text>
+
+        {theirFriends.length > 0 ? (
+          <Card padded={false} style={{ paddingVertical: spacing.xs }}>
+            {theirFriends.map((friend, index) => (
+              <View key={friend.id}>
+                {index > 0 ? (
+                  <View
+                    style={{
+                      height: StyleSheet.hairlineWidth,
+                      backgroundColor: colors.border,
+                      marginLeft: spacing.md * 2 + 48,
+                    }}
+                  />
+                ) : null}
+                <PersonRow
+                  name={friend.name}
+                  subtitle={friend.city}
+                  connectors={friend.connectors}
+                  onPress={() => navigation.push('FriendProfile', { userId: friend.id })}
+                  onMessage={() => openDirectMessage(friend.id)}
+                />
+              </View>
+            ))}
+          </Card>
+        ) : (
+          <Card>
+            <EmptyState
+              icon="🔒"
+              title="Nothing to show"
+              message={`You'll see ${person.name.split(' ')[0]}'s connections once you share more of the network.`}
+            />
+          </Card>
+        )}
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  content: {
+  body: {
     flex: 1,
   },
-  contentContainer: {
-    paddingBottom: 40,
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  backButton: {
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  photoSection: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 16,
-  },
-  photoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
+  identityCard: {
     alignItems: 'center',
   },
-  photoPlaceholder: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  nameSection: {
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: -0.5,
-  },
-  infoSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  infoRow: {
+  identityActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
-  infoLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  interestsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionHeader: {
+  statRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: -0.3,
-  },
-  interestsContainer: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  interestTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0fdfa',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  interestText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#14b8a6',
-  },
-  noInterestsText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginTop: 8,
-    color: '#64748b',
-  },
-  friendsContainer: {
-    gap: 12,
-  },
-  friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  friendAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  friendAvatarText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  friendInfo: {
-    flex: 1,
-  },
-  friendName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  friendCity: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  arrowText: {
-    fontSize: 20,
-    color: '#94a3b8',
-  },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 40,
-  },
 });
-

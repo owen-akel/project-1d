@@ -1,41 +1,12 @@
 // Mock events database - split into major events and connection events
 
-import { ALL_USERS, getUsersByCity } from './users';
+import { getUsersByCity } from './users';
+import { getVisibleUserIdsByCity } from '../social/visibility';
 
-// Helper to check if a user can be viewed (same logic as MapScreen)
-function canViewUser(targetUserId, currentUserFriends) {
-  // Main users are only visible if they're in the friends list
-  if (targetUserId.startsWith('main-user-')) {
-    return currentUserFriends.includes(targetUserId);
-  }
-  
-  // Extract parent main user from friend ID (e.g., "rod-friend-5" -> "rod")
-  const parts = targetUserId.split('-');
-  if (parts.length >= 2 && parts[1] === 'friend') {
-    const firstName = parts[0];
-    const mainUserIndex = [
-      'rod', 'sam', 'clay', 'harry', 'john', 'pete',
-      'liam', 'warren', 'jackson', 'eric', 'simon', 'greg'
-    ].indexOf(firstName);
-    
-    if (mainUserIndex !== -1) {
-      const parentMainUserId = `main-user-${mainUserIndex + 1}`;
-      // Only visible if parent main user is in friends list
-      return currentUserFriends.includes(parentMainUserId);
-    }
-  }
-  
-  // Default: not visible
-  return false;
-}
-
-// Get visible users by city (friends + their friends who live in that city)
-// Note: This function will be called with friends array from context
+// Re-exported for backwards compatibility; the rule itself now lives in
+// src/social/visibility.js so every screen shares one implementation.
 export function getVisibleUsersByCity(city, friends = []) {
-  const cityUsers = getUsersByCity(city);
-  return cityUsers
-    .filter(user => canViewUser(user.id, friends))
-    .map(user => user.id);
+  return getVisibleUserIdsByCity(city, friends);
 }
 
 // Connection Events Templates (individual user events)

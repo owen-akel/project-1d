@@ -1,269 +1,321 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useFriends } from '../context/FriendsContext';
+import { useChat } from '../context/ChatContext';
+import { getReachablePeople } from '../src/social/connections';
+import {
+  Screen,
+  ScreenHeader,
+  Card,
+  Button,
+  Chip,
+  Avatar,
+  EmptyState,
+  SearchInput,
+  PersonRow,
+} from '../src/ui';
+
+const DEGREE_FILTERS = [
+  { key: 'all', label: 'Everyone' },
+  { key: 'friends', label: 'Friends' },
+  { key: 'fof', label: 'Friends of friends' },
+];
 
 export default function NewChatScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing, radius, typography } = useTheme();
   const navigation = useNavigation();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { friends } = useFriends();
+  const { openDirectConversation, createGroupConversation } = useChat();
 
-  // Sample connections - in a real app, this would come from a backend
-  const [connections] = useState([
-    {
-      id: 1,
-      userId: 'user1',
-      username: 'Alex',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 2,
-      userId: 'user2',
-      username: 'Sam',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 3,
-      userId: 'user3',
-      username: 'Jordan',
-      avatar: '👤',
-      isOnline: false,
-    },
-    {
-      id: 4,
-      userId: 'user4',
-      username: 'Casey',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 5,
-      userId: 'user5',
-      username: 'Morgan',
-      avatar: '👤',
-      isOnline: false,
-    },
-    {
-      id: 6,
-      userId: 'user6',
-      username: 'Taylor',
-      avatar: '👤',
-      isOnline: false,
-    },
-    {
-      id: 7,
-      userId: 'user7',
-      username: 'Riley',
-      avatar: '👤',
-      isOnline: true,
-    },
-    {
-      id: 8,
-      userId: 'user8',
-      username: 'Avery',
-      avatar: '👤',
-      isOnline: false,
-    },
-  ]);
+  const [query, setQuery] = useState('');
+  const [degreeFilter, setDegreeFilter] = useState('all');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [groupName, setGroupName] = useState('');
 
-  const filteredConnections = connections.filter((connection) =>
-    connection.username.toLowerCase().includes(searchQuery.toLowerCase())
+  // Everyone one or two hops out, each carrying the friends they're linked through.
+  const people = useMemo(() => getReachablePeople(friends), [friends]);
+  const peopleById = useMemo(
+    () => new Map(people.map((entry) => [entry.user.id, entry])),
+    [people]
   );
 
-  const handleSelectConnection = (connection) => {
-    // In a real app, this would navigate to the chat with this connection
-    console.log('Start chat with:', connection.username);
-    // For now, just go back to the chat screen
-    // In the future, you could navigate to a specific chat screen
-    navigation.goBack();
+  const filtered = useMemo(() => {
+    const search = query.trim().toLowerCase();
+
+    return people
+      .filter((entry) => {
+        if (degreeFilter === 'friends' && entry.degree !== 1) return false;
+        if (degreeFilter === 'fof' && entry.degree !== 2) return false;
+        if (!search) return true;
+        return (
+          entry.user.name.toLowerCase().includes(search) ||
+          (entry.user.city || '').toLowerCase().includes(search) ||
+          entry.connectors.some((connector) => connector.name.toLowerCase().includes(search))
+        );
+      })
+      .sort((a, b) => {
+        if (a.degree !== b.degree) return a.degree - b.degree;
+        return a.user.name.localeCompare(b.user.name);
+      })
+      .slice(0, 60);
+  }, [people, query, degreeFilter]);
+
+  const toggle = (userId) => {
+    setSelectedIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
   };
 
-  const renderConnection = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.connectionItem, { backgroundColor: colors.background }]}
-      activeOpacity={0.7}
-      onPress={() => handleSelectConnection(item)}
-    >
-      <View style={styles.avatarContainer}>
-        <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{item.avatar}</Text>
-        </View>
-        {item.isOnline && <View style={[styles.onlineIndicator, { backgroundColor: '#10b981' }]} />}
-      </View>
-      <View style={styles.connectionContent}>
-        <Text style={[styles.connectionUsername, { color: colors.textPrimary }]}>
-          {item.username}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const isGroup = selectedIds.length > 1;
+
+  const handleCreate = () => {
+    if (selectedIds.length === 0) return;
+
+    const conversationId = isGroup
+      ? createGroupConversation(groupName, selectedIds)
+      : openDirectConversation(selectedIds[0]);
+
+    // Replace so backing out of the thread returns to the conversation list,
+    // not to this picker.
+    navigation.replace('Conversation', { conversationId });
+  };
+
+  const selectedPeople = selectedIds
+    .map((id) => peopleById.get(id))
+    .filter(Boolean);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>←</Text>
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>New Chat</Text>
-        <View style={styles.placeholder} />
-      </View>
+    <Screen>
+      <ScreenHeader
+        title="New chat"
+        subtitle={
+          selectedIds.length === 0
+            ? 'Pick one person, or several for a group'
+            : isGroup
+            ? `Group · ${selectedIds.length} people`
+            : 'Direct message'
+        }
+        onBack={() => navigation.goBack()}
+      >
+        <SearchInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search friends and friends of friends"
+        />
+        <View style={[styles.filterRow, { marginTop: spacing.md }]}>
+          {DEGREE_FILTERS.map((filter) => (
+            <Chip
+              key={filter.key}
+              label={filter.label}
+              selected={degreeFilter === filter.key}
+              onPress={() => setDegreeFilter(filter.key)}
+            />
+          ))}
+        </View>
+      </ScreenHeader>
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
-        <TextInput
+      {/* Selected participants stay pinned so you can see who's in the group */}
+      {selectedPeople.length > 0 ? (
+        <View
           style={[
-            styles.searchInput,
+            styles.selectedTray,
             {
-              backgroundColor: colors.backgroundSecondary,
-              borderColor: colors.border,
-              color: colors.textPrimary,
+              backgroundColor: colors.background,
+              borderBottomColor: colors.border,
+              paddingVertical: spacing.md,
             },
           ]}
-          placeholder="Search connections..."
-          placeholderTextColor={colors.textTertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md }}
+          >
+            {selectedPeople.map((entry) => (
+              <TouchableOpacity
+                key={entry.user.id}
+                style={styles.selectedItem}
+                onPress={() => toggle(entry.user.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${entry.user.name}`}
+              >
+                <Avatar name={entry.user.name} size="sm" connectors={entry.connectors} />
+                <View style={[styles.removeDot, { backgroundColor: colors.textTertiary, borderColor: colors.background }]}>
+                  <Text style={[styles.removeDotText, { color: colors.background }]}>✕</Text>
+                </View>
+                <Text
+                  style={[typography.caption, { color: colors.textSecondary, fontSize: 11, marginTop: 4 }]}
+                  numberOfLines={1}
+                >
+                  {entry.user.name.split(' ')[0]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
-      {/* Connections List */}
-      <FlatList
-        data={filteredConnections}
-        renderItem={renderConnection}
-        keyExtractor={(item) => item.id.toString()}
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxxl }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              No connections found
-            </Text>
-          </View>
-        }
-      />
-    </View>
+        keyboardShouldPersistTaps="handled"
+      >
+        {isGroup ? (
+          <Card style={{ marginBottom: spacing.lg }}>
+            <Text style={[typography.label, { color: colors.textPrimary }]}>Group name</Text>
+            <TextInput
+              style={[
+                typography.body,
+                styles.input,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                  borderRadius: radius.md,
+                  marginTop: spacing.sm,
+                },
+              ]}
+              placeholder="Optional — we'll name it after the members"
+              placeholderTextColor={colors.textTertiary}
+              value={groupName}
+              onChangeText={setGroupName}
+            />
+          </Card>
+        ) : null}
+
+        {filtered.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon="🔍"
+              title="No one found"
+              message={
+                query
+                  ? `Nobody in your network matches “${query}”.`
+                  : 'Add friends to start building your network.'
+              }
+            />
+          </Card>
+        ) : (
+          <Card padded={false} style={{ paddingVertical: spacing.xs }}>
+            {filtered.map((entry, index) => {
+              const selected = selectedIds.includes(entry.user.id);
+              return (
+                <View key={entry.user.id}>
+                  {index > 0 ? (
+                    <View
+                      style={{
+                        height: StyleSheet.hairlineWidth,
+                        backgroundColor: colors.border,
+                        marginLeft: spacing.md * 2 + 48,
+                      }}
+                    />
+                  ) : null}
+                  <PersonRow
+                    name={entry.user.name}
+                    subtitle={entry.user.city}
+                    meta={entry.degree === 1 ? 'Friend' : undefined}
+                    connectors={entry.connectors}
+                    selected={selected}
+                    onPress={() => toggle(entry.user.id)}
+                    right={
+                      <View
+                        style={[
+                          styles.checkbox,
+                          {
+                            borderColor: selected ? colors.primary : colors.borderStrong,
+                            backgroundColor: selected ? colors.primary : 'transparent',
+                          },
+                        ]}
+                      >
+                        {selected ? (
+                          <Text style={[styles.checkmark, { color: colors.onPrimary }]}>✓</Text>
+                        ) : null}
+                      </View>
+                    }
+                  />
+                </View>
+              );
+            })}
+          </Card>
+        )}
+      </ScrollView>
+
+      {selectedIds.length > 0 ? (
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.md,
+              paddingBottom: spacing.xl,
+            },
+          ]}
+        >
+          <Button
+            label={isGroup ? `Create group · ${selectedIds.length}` : 'Start chat'}
+            onPress={handleCreate}
+            fullWidth
+          />
+        </View>
+      ) : null}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  body: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
-  header: {
+  filterRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#ffffff',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  selectedTray: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  backButtonText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  placeholder: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    letterSpacing: -0.3,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  searchInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  listContent: {
-    paddingTop: 4,
-  },
-  connectionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
+  selectedItem: {
+    width: 52,
     alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 28,
-  },
-  onlineIndicator: {
+  removeDot: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  connectionContent: {
-    flex: 1,
-  },
-  connectionUsername: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    top: -2,
+    right: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
     alignItems: 'center',
-    paddingTop: 100,
+    justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999999',
+  removeDotText: {
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  input: {
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

@@ -1,4 +1,7 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useMemo, useCallback } from 'react';
+import { USERS_BY_ID } from '../src/mock/users';
+import { FRIENDS_BY_USER_ID } from '../src/mock/graph';
+import { CURRENT_USER_ID } from '../src/social/visibility';
 
 const FriendsContext = createContext();
 
@@ -10,56 +13,148 @@ export const useFriends = () => {
   return context;
 };
 
-export const FriendsProvider = ({ children }) => {
-  // Current user ID (fixed mock)
-  const CURRENT_USER_ID = 'current-user-1';
-    // Default friends: the 12 main users
-  const DEFAULT_FRIENDS = [
-    'main-user-1',  // Rod Oskouian
-    'main-user-2',  // Sam Haskel
-    'main-user-3',  // Clay Socas
-    'main-user-4',  // Harry Dahl
-    'main-user-5',  // John Jerro
-    'main-user-6',  // Pete McKenna
-    'main-user-7',  // Liam Tassiello
-    'main-user-8',  // Warren Klein
-    'main-user-9',  // Jackson George
-    'main-user-10', // Eric Deekan
-    'main-user-11', // Simon Sloane
-    'main-user-12', // Greg Kosmowski
-  ];
-  
-  // Friends list (array of user IDs) - initialized with default friends
-  const [friends, setFriends] = useState(DEFAULT_FRIENDS);
-  
-  const addFriend = (userId) => {
-    if (userId === CURRENT_USER_ID) return; // Can't add self
-    setFriends(prev => {
-      if (prev.includes(userId)) return prev; // Already a friend
-      return [...prev, userId];
-    });
-  };
-  
-  const removeFriend = (userId) => {
-    setFriends(prev => prev.filter(id => id !== userId));
-  };
-  
-  const isFriend = (userId) => {
-    return friends.includes(userId);
-  };
-  
-  return (
-    <FriendsContext.Provider
-      value={{
-        friends,
-        addFriend,
-        removeFriend,
-        isFriend,
-        currentUserId: CURRENT_USER_ID,
-      }}
-    >
-      {children}
-    </FriendsContext.Provider>
-  );
-};
+// Default friends: the 12 main users.
+const DEFAULT_FRIENDS = Array.from({ length: 12 }, (_, index) => `main-user-${index + 1}`);
 
+/**
+ * Seed a handful of pending incoming requests so the feature has something to
+ * show on first run. They're drawn from friends-of-friends, which is who would
+ * realistically be knocking.
+ */
+function buildSeedIncomingRequests(friendIds) {
+  const directSet = new Set(friendIds);
+  const candidates = [];
+
+  friendIds.forEach((friendId) => {
+    (FRIENDS_BY_USER_ID.get(friendId) || []).forEach((candidateId) => {
+      if (directSet.has(candidateId) || candidateId === CURRENT_USER_ID) return;
+      if (candidates.some((item) => item.userId === candidateId)) return;
+      if (!USERS_BY_ID.has(candidateId)) return;
+      candidates.push({ userId: candidateId, viaId: friendId });
+    });
+  });
+
+  const messages = [
+    'We met at the show last weekend!',
+    null,
+    'Saw we have a few friends in common.',
+    null,
+    'Hey — Rod said I should add you.',
+  ];
+
+  return candidates.slice(0, 5).map((candidate, index) => ({
+    id: `seed-request-${index + 1}`,
+    userId: candidate.userId,
+    viaId: candidate.viaId,
+    message: messages[index % messages.length],
+    // Staggered so the list has a believable ordering, newest first.
+    createdAt: Date.now() - (index + 1) * 1000 * 60 * 60 * 7,
+  }));
+}
+
+export const FriendsProvider = ({ children }) => {
+  const [friends, setFriends] = useState(DEFAULT_FRIENDS);
+  const [incomingRequests, setIncomingRequests] = useState(() =>
+    buildSeedIncomingRequests(DEFAULT_FRIENDS)
+  );
+  const [outgoingRequests, setOutgoingRequests] = useState([]);
+
+  const isFriend = useCallback((userId) => friends.includes(userId), [friends]);
+
+  const addFriend = useCallback((userId) => {
+    if (!userId || userId === CURRENT_USER_ID) return;
+    setFriends((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
+  }, []);
+
+  const removeFriend = useCallback((userId) => {
+    setFriends((prev) => prev.filter((id) => id !== userId));
+  }, []);
+
+  /** Ask to connect. No-op if they're already a friend or a request is in flight. */
+  const sendFriendRequest = useCallback(
+    (userId, message = null) => {
+      if (!userId || userId === CURRENT_USER_ID) return;
+      if (friends.includes(userId)) return;
+
+      // If they already asked us, sending back is the same as accepting.
+      const incoming = incomingRequests.find((request) => request.userId === userId);
+      if (incoming) {
+        setIncomingRequests((prev) => prev.filter((request) => request.id !== incoming.id));
+        addFriend(userId);
+        return;
+      }
+
+      setOutgoingRequests((prev) => {
+        if (prev.some((request) => request.userId === userId)) return prev;
+        return [
+          { id: `outgoing-${userId}-${Date.now()}`, userId, message, createdAt: Date.now() },
+          ...prev,
+        ];
+      });
+    },
+    [friends, incomingRequests, addFriend]
+  );
+
+  const cancelFriendRequest = useCallback((userId) => {
+    setOutgoingRequests((prev) => prev.filter((request) => request.userId !== userId));
+  }, []);
+
+  const acceptFriendRequest = useCallback(
+    (requestId) => {
+      const request = incomingRequests.find((item) => item.id === requestId);
+      if (!request) return;
+      setIncomingRequests((prev) => prev.filter((item) => item.id !== requestId));
+      addFriend(request.userId);
+    },
+    [incomingRequests, addFriend]
+  );
+
+  const declineFriendRequest = useCallback((requestId) => {
+    setIncomingRequests((prev) => prev.filter((item) => item.id !== requestId));
+  }, []);
+
+  /** 'self' | 'friend' | 'incoming' | 'outgoing' | 'none' */
+  const getRelationship = useCallback(
+    (userId) => {
+      if (!userId || userId === CURRENT_USER_ID) return 'self';
+      if (friends.includes(userId)) return 'friend';
+      if (incomingRequests.some((request) => request.userId === userId)) return 'incoming';
+      if (outgoingRequests.some((request) => request.userId === userId)) return 'outgoing';
+      return 'none';
+    },
+    [friends, incomingRequests, outgoingRequests]
+  );
+
+  const value = useMemo(
+    () => ({
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      pendingRequestCount: incomingRequests.length,
+      addFriend,
+      removeFriend,
+      isFriend,
+      sendFriendRequest,
+      cancelFriendRequest,
+      acceptFriendRequest,
+      declineFriendRequest,
+      getRelationship,
+      currentUserId: CURRENT_USER_ID,
+    }),
+    [
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      addFriend,
+      removeFriend,
+      isFriend,
+      sendFriendRequest,
+      cancelFriendRequest,
+      acceptFriendRequest,
+      declineFriendRequest,
+      getRelationship,
+    ]
+  );
+
+  return <FriendsContext.Provider value={value}>{children}</FriendsContext.Provider>;
+};

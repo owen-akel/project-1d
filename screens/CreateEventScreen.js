@@ -12,6 +12,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { ALL_USERS } from '../src/mock/users';
 import { useUser } from '../context/UserContext';
+import { toMockCityName, CURRENT_USER_ID } from '../src/social/visibility';
+import { Screen, ScreenHeader } from '../src/ui';
 
 export default function CreateEventScreen() {
   const { colors } = useTheme();
@@ -59,24 +61,13 @@ export default function CreateEventScreen() {
     });
   };
 
-  // Map city names from UserContext to mock data city codes
-  const mapCityNameToMockCity = (cityName) => {
-    const cityMap = {
-      'New York': 'NYC',
-      'Los Angeles': 'LA',
-      'San Francisco': 'SF',
-    };
-    return cityMap[cityName] || cityName;
-  };
-
   const handleCreateEvent = () => {
     if (!title.trim() || !time.trim() || !destination.trim()) {
       alert('Please fill in all required fields (Title, Time, and Destination)');
       return;
     }
 
-    const CURRENT_USER_ID = 'current-user-1';
-    const mockCityName = user?.residence ? mapCityNameToMockCity(user.residence) : 'NYC';
+    const mockCityName = user?.residence ? toMockCityName(user.residence) : 'NYC';
     
     // Generate a unique event ID
     const eventId = `user-event-${Date.now()}`;
@@ -117,7 +108,14 @@ export default function CreateEventScreen() {
           <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
             <Text style={styles.avatarText}>{item.avatar}</Text>
           </View>
-          {item.isOnline && <View style={[styles.onlineIndicator, { backgroundColor: '#10b981' }]} />}
+          {item.isOnline ? (
+            <View
+              style={[
+                styles.onlineIndicator,
+                { backgroundColor: colors.success, borderColor: colors.card },
+              ]}
+            />
+          ) : null}
         </View>
         <View style={styles.collaboratorContent}>
           <Text style={[styles.collaboratorUsername, { color: colors.textPrimary }]}>
@@ -126,7 +124,7 @@ export default function CreateEventScreen() {
         </View>
         {isSelected && (
           <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-            <Text style={styles.checkmarkText}>✓</Text>
+            <Text style={[styles.checkmarkText, { color: colors.onPrimary }]}>✓</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -134,18 +132,8 @@ export default function CreateEventScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>←</Text>
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Create Event</Text>
-        <View style={styles.placeholder} />
-      </View>
+    <Screen>
+      <ScreenHeader title="Create event" onBack={() => navigation.goBack()} />
 
       <ScrollView
         style={styles.content}
@@ -254,49 +242,14 @@ export default function CreateEventScreen() {
           onPress={handleCreateEvent}
           activeOpacity={0.8}
         >
-          <Text style={styles.createButtonText}>Create Event</Text>
+          <Text style={[styles.createButtonText, { color: colors.onPrimary }]}>Create Event</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  backButtonText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  placeholder: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    letterSpacing: -0.3,
-  },
   content: {
     flex: 1,
   },

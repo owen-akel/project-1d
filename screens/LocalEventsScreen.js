@@ -5,16 +5,30 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   ActivityIndicator,
   Image,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
 import { getMajorEventsByCity } from '../src/mock/events';
 import { USERS_BY_ID, getUsersByCity } from '../src/mock/users';
+import { canViewUser, toMockCityName, CURRENT_USER_ID } from '../src/social/visibility';
+import { getConnectorFriends } from '../src/social/connections';
+import useOpenChat from '../src/hooks/useOpenChat';
+import {
+  Screen,
+  ScreenHeader,
+  Card,
+  Button,
+  Chip,
+  EmptyState,
+  PersonRow,
+  BottomSheet,
+  getInitials,
+} from '../src/ui';
 
 const EVENTS_API_BASE_URL = 'http://localhost:4000';
 
@@ -257,21 +271,10 @@ const getOccurrenceTimeMeta = (occurrence) => {
 
 export default function LocalEventsScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
+  const { openDirectMessage } = useOpenChat();
   const { user } = useUser();
   const { friends } = useFriends();
-
-  // Current user ID
-  const CURRENT_USER_ID = 'current-user-1';
-
-  // Map city names from UserContext to mock data city codes
-  const mapCityNameToMockCity = (cityName) => {
-    const cityMap = {
-      'New York': 'NYC',
-      'Los Angeles': 'LA',
-      'San Francisco': 'SF',
-    };
-    return cityMap[cityName] || cityName;
-  };
 
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [rangeStart, setRangeStart] = useState(getTodayYmd());
@@ -292,8 +295,7 @@ export default function LocalEventsScreen() {
     if (!user?.residence) {
       return [];
     }
-    const mockCityName = mapCityNameToMockCity(user.residence);
-    return getMajorEventsByCity(mockCityName, friends);
+    return getMajorEventsByCity(toMockCityName(user.residence), friends);
   }, [user?.residence, friends]);
 
   useEffect(() => {
@@ -657,7 +659,7 @@ export default function LocalEventsScreen() {
       const ymd = toYmd(cursor);
       marks[ymd] = {
         color: colors.primary,
-        textColor: '#ffffff',
+        textColor: colors.onPrimary,
         startingDay: ymd === rangeStart,
         endingDay: ymd === end,
       };
@@ -691,54 +693,30 @@ export default function LocalEventsScreen() {
   // Get visible attendees for an event (only those who live in the city and are visible, plus current user)
   const getVisibleAttendees = (event, attendeeIdsOverride = null) => {
     if (!event || !user?.residence) return [];
-    const mockCityName = mapCityNameToMockCity(user.residence);
-    const cityUsers = getUsersByCity(mockCityName);
-    const cityUserIds = new Set(cityUsers.map(u => u.id));
-    
-    // Helper to check if a user can be viewed
-    const canViewUser = (targetUserId) => {
-      // Current user is always visible
-      if (targetUserId === CURRENT_USER_ID) return true;
-      if (targetUserId.startsWith('main-user-')) {
-        return friends.includes(targetUserId);
-      }
-      const parts = targetUserId.split('-');
-      if (parts.length >= 2 && parts[1] === 'friend') {
-        const firstName = parts[0];
-        const mainUserIndex = [
-          'rod', 'sam', 'clay', 'harry', 'john', 'pete',
-          'liam', 'warren', 'jackson', 'eric', 'simon', 'greg'
-        ].indexOf(firstName);
-        if (mainUserIndex !== -1) {
-          const parentMainUserId = `main-user-${mainUserIndex + 1}`;
-          return friends.includes(parentMainUserId);
-        }
-      }
-      return false;
-    };
-    
+    const cityUserIds = new Set(
+      getUsersByCity(toMockCityName(user.residence)).map((cityUser) => cityUser.id)
+    );
+
     const attendeeIds = attendeeIdsOverride || event.attendeeIds || [];
 
     return attendeeIds
-      .filter(attendeeId => {
+      .filter((attendeeId) => {
         // Current user is always shown, others must live in the city
         if (attendeeId === CURRENT_USER_ID) return true;
         return cityUserIds.has(attendeeId);
       })
-      .filter(attendeeId => canViewUser(attendeeId)) // Must be visible
-      .map(attendeeId => {
-        if (attendeeId === CURRENT_USER_ID) {
-          return {
-            id: CURRENT_USER_ID,
-            name: user?.name || 'You',
-            avatar: user?.name ? user.name.split(' ').map(n => n[0]).join('') : '👤',
-          };
-        }
-        const user = USERS_BY_ID.get(attendeeId);
+      .filter((attendeeId) => canViewUser(attendeeId, friends))
+      .map((attendeeId) => {
+        const isCurrentUser = attendeeId === CURRENT_USER_ID;
+        const attendee = isCurrentUser ? { name: user?.name || 'You' } : USERS_BY_ID.get(attendeeId);
+        const name = attendee?.name || 'Unknown';
         return {
           id: attendeeId,
-          name: user?.name || 'Unknown',
-          avatar: user?.name ? user.name.split(' ').map(n => n[0]).join('') : '👤',
+          name,
+          avatar: getInitials(name),
+          city: attendee?.city,
+          isCurrentUser,
+          connectors: isCurrentUser ? [] : getConnectorFriends(attendeeId, friends),
         };
       });
   };
@@ -781,558 +759,349 @@ export default function LocalEventsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Local Events</Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-          Events in {user?.residence || 'your city'}
-        </Text>
-        <TouchableOpacity
-          style={[styles.dateRangeButton, { borderColor: colors.border, backgroundColor: colors.card }]}
-          activeOpacity={0.75}
-          onPress={() => setCalendarVisible(true)}
-        >
-          <Text style={[styles.dateRangeButtonText, { color: colors.textPrimary }]}>
-            Date Range: {formatReadableDateRange(rangeStart, rangeEnd)}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, { borderColor: colors.border, backgroundColor: colors.card }]}
-          activeOpacity={0.75}
-          onPress={() => setFiltersVisible(true)}
-        >
-          <Text style={[styles.filterButtonText, { color: colors.textPrimary }]}>
-            Filters{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <Screen>
+      <ScreenHeader title="Local" subtitle={`Events in ${user?.residence || 'your city'}`}>
+        <View style={styles.headerControls}>
+          <Chip
+            label={`📅  ${formatReadableDateRange(rangeStart, rangeEnd)}`}
+            onPress={() => setCalendarVisible(true)}
+          />
+          <Chip
+            label={activeFiltersCount > 0 ? `Filters · ${activeFiltersCount}` : 'Filters'}
+            selected={activeFiltersCount > 0}
+            onPress={() => setFiltersVisible(true)}
+          />
+        </View>
+      </ScreenHeader>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {isLoadingEvents ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading events...</Text>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading events…</Text>
           </View>
         ) : null}
         {eventsError ? (
           <Text style={[styles.fetchErrorText, { color: colors.textSecondary }]}>
-            Live events unavailable. Showing local data.
+            Live events unavailable — showing saved data.
           </Text>
         ) : null}
         {displayedEvents.length > 0 ? (
           displayedEvents.map((event) => {
+            const going = interestedEvents.has(event.id);
+            const attendeeCount = getVisibleAttendees(event).length;
+
             return (
-              <View
-                key={event.id}
-                style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-              >
+              <Card key={event.id} style={styles.eventCard} onPress={() => openDetailsModal(event.id)}>
                 <View style={styles.eventCardTop}>
-                  <TouchableOpacity
-                    style={styles.eventDetailsTapArea}
-                    onPress={() => openDetailsModal(event.id)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={styles.eventIconContainer}>
-                      <Text style={styles.eventIcon}>{getEventIcon(event.type)}</Text>
-                    </View>
-                    <View style={styles.eventContent}>
-                      <Text style={[styles.eventTitle, { color: colors.textPrimary }]}>{event.title}</Text>
-                      <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>📍 {event.location}</Text>
-                      <View style={styles.eventDetails}>
-                        <Text style={[styles.eventDate, { color: colors.textSecondary }]}>🕐 {formatEventDate(event)}</Text>
-                        <TouchableOpacity
-                          onPress={() => openAttendeesModal(event.id)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.eventAttendees, { color: colors.textSecondary }]}>
-                            👥 {getVisibleAttendees(event).length} going
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                  <View style={[styles.eventIconContainer, { backgroundColor: colors.primaryMuted }]}>
+                    <Text style={styles.eventIcon}>{getEventIcon(event.type)}</Text>
+                  </View>
+                  <View style={styles.eventContent}>
+                    <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                      {event.title}
+                    </Text>
+                    <Text style={[styles.eventMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {event.location}
+                    </Text>
+                    <Text style={[styles.eventMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {formatEventDate(event)}
+                    </Text>
+                    <View style={styles.eventTagRow}>
+                      <TouchableOpacity
+                        onPress={() => openAttendeesModal(event.id)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Text style={[styles.eventTag, { color: colors.primary }]}>
+                          {attendeeCount} going
+                        </Text>
+                      </TouchableOpacity>
                       {event.occurrences?.length > 1 ? (
-                        <Text style={[styles.multiTimeText, { color: colors.textSecondary }]}>
-                          {event.occurrences.length} available times - tap for details
+                        <Text style={[styles.eventTag, { color: colors.textTertiary }]}>
+                          {event.occurrences.length} times
                         </Text>
                       ) : null}
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 </View>
-                <TouchableOpacity
-                  style={[
-                    styles.interestedButton,
-                    {
-                      backgroundColor: interestedEvents.has(event.id) ? colors.primary : colors.backgroundSecondary,
-                      borderColor: interestedEvents.has(event.id) ? colors.primary : colors.border,
-                    },
-                  ]}
+
+                <Button
+                  label={going ? 'Going ✓  ·  Manage times' : "I'm going  ·  Pick a time"}
+                  variant={going ? 'primary' : 'secondary'}
                   onPress={() => openDetailsModal(event.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.interestedButtonText,
-                      {
-                        color: interestedEvents.has(event.id) ? '#ffffff' : colors.textPrimary,
-                      },
-                    ]}
-                  >
-                    {interestedEvents.has(event.id) ? 'Going ✓ (Manage Times)' : "I'm Going (Pick Time)"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  fullWidth
+                  style={styles.eventAction}
+                />
+              </Card>
             );
           })
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-              No events found between {rangeStart} and {rangeEnd}
-            </Text>
-          </View>
+          <EmptyState
+            icon="🗓️"
+            title="No events found"
+            message={`Nothing between ${formatReadableDateRange(rangeStart, rangeEnd)}. Try a wider date range or clearing filters.`}
+            actionLabel={activeFiltersCount > 0 ? 'Clear filters' : undefined}
+            onAction={activeFiltersCount > 0 ? clearAllFilters : undefined}
+          />
         )}
       </ScrollView>
 
-      <Modal
+      <BottomSheet
         visible={calendarVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setCalendarVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setCalendarVisible(false)}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Pick Date Range</Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                Tap once for start date, tap again for end date
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setCalendarVisible(false)}
-              >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.calendarContainer}>
-              <Calendar
-                markingType="period"
-                markedDates={markedDates}
-                onDayPress={onCalendarDayPress}
-                theme={{
-                  calendarBackground: colors.card,
-                  dayTextColor: colors.textPrimary,
-                  monthTextColor: colors.textPrimary,
-                  arrowColor: colors.primary,
-                  todayTextColor: colors.primary,
-                  textDisabledColor: colors.textSecondary,
-                }}
-              />
-            </View>
-            <View style={styles.calendarActions}>
-              <TouchableOpacity
-                style={[styles.calendarActionButton, { borderColor: colors.border }]}
-                onPress={clearDateRange}
-              >
-                <Text style={[styles.calendarActionButtonText, { color: colors.textPrimary }]}>Reset</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.calendarActionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                onPress={() => setCalendarVisible(false)}
-              >
-                <Text style={[styles.calendarActionButtonText, { color: '#ffffff' }]}>Apply</Text>
-              </TouchableOpacity>
-            </View>
+        onClose={() => setCalendarVisible(false)}
+        title="Pick a date range"
+        subtitle="Tap once for the start date, again for the end"
+        footer={
+          <View style={styles.sheetActions}>
+            <Button
+              label="Reset"
+              variant="secondary"
+              onPress={clearDateRange}
+              style={styles.sheetAction}
+            />
+            <Button
+              label="Apply"
+              onPress={() => setCalendarVisible(false)}
+              style={styles.sheetAction}
+            />
           </View>
+        }
+      >
+        <View style={styles.calendarContainer}>
+          <Calendar
+            markingType="period"
+            markedDates={markedDates}
+            onDayPress={onCalendarDayPress}
+            theme={{
+              calendarBackground: colors.card,
+              dayTextColor: colors.textPrimary,
+              monthTextColor: colors.textPrimary,
+              arrowColor: colors.primary,
+              todayTextColor: colors.primary,
+              textDisabledColor: colors.textTertiary,
+            }}
+          />
         </View>
-      </Modal>
+      </BottomSheet>
 
-      <Modal
+      <BottomSheet
         visible={detailsEventId !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeDetailsModal}
+        onClose={closeDetailsModal}
+        title={getDetailsEvent()?.title || 'Event'}
+        subtitle={getDetailsEvent()?.location}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeDetailsModal}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                {getDetailsEvent()?.title}
-              </Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                {getDetailsEvent()?.location}
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={closeDetailsModal}
+        <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsContent}>
+          {getDetailsEvent()?.imageUrl ? (
+            <Image
+              source={{ uri: getDetailsEvent().imageUrl }}
+              style={[styles.detailsImage, { backgroundColor: colors.backgroundSecondary }]}
+              resizeMode="cover"
+            />
+          ) : null}
+
+          <Text style={[styles.detailsSectionTitle, { color: colors.textPrimary }]}>About</Text>
+          <Text style={[styles.detailsDescription, { color: colors.textSecondary }]}>
+            {getDetailsEvent()?.description || 'No description available.'}
+          </Text>
+
+          <Text style={[styles.detailsSectionTitle, { color: colors.textPrimary }]}>
+            Dates &amp; times · {getDetailsEvent()?.occurrences?.length || 1}
+          </Text>
+          {(
+            getDetailsEvent()?.occurrences || [
+              {
+                date: getDetailsEvent()?.date || 'TBD',
+                attendeeIds: getDetailsEvent()?.attendeeIds || [],
+              },
+            ]
+          ).map((occurrence, index) => {
+            const detailsEvent = getDetailsEvent();
+            const visibleCount = detailsEvent
+              ? getVisibleAttendees(detailsEvent, occurrence.attendeeIds || []).length
+              : 0;
+            const userGoing = (occurrence.attendeeIds || []).includes(CURRENT_USER_ID);
+
+            return (
+              <View
+                key={`${occurrence.id || index}-${occurrence.startAt || occurrence.date}`}
+                style={[styles.occurrenceRow, { borderBottomColor: colors.border }]}
               >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsContent}>
-              {getDetailsEvent()?.imageUrl ? (
-                <Image
-                  source={{ uri: getDetailsEvent().imageUrl }}
-                  style={styles.detailsImage}
-                  resizeMode="cover"
+                <View style={styles.occurrenceRowTop}>
+                  <Text style={[styles.occurrenceText, { color: colors.textPrimary }]}>
+                    {formatOccurrenceDate(occurrence)}
+                  </Text>
+                  <Text style={[styles.occurrenceCountText, { color: colors.textSecondary }]}>
+                    {visibleCount} going
+                  </Text>
+                </View>
+                <Button
+                  label={userGoing ? "I'm going ✓" : "I'm going"}
+                  variant={userGoing ? 'primary' : 'secondary'}
+                  size="sm"
+                  fullWidth
+                  style={{ marginTop: 8 }}
+                  onPress={() => {
+                    if (detailsEvent) {
+                      toggleOccurrenceInterest(detailsEvent, occurrence);
+                    }
+                  }}
                 />
-              ) : null}
-              <Text style={[styles.detailsSectionTitle, { color: colors.textPrimary }]}>Description</Text>
-              <Text style={[styles.detailsDescription, { color: colors.textSecondary }]}>
-                {getDetailsEvent()?.description || 'No description available.'}
-              </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </BottomSheet>
 
-              <Text style={[styles.detailsSectionTitle, { color: colors.textPrimary }]}>
-                Dates & Times ({getDetailsEvent()?.occurrences?.length || 1})
-              </Text>
-              {(getDetailsEvent()?.occurrences || [{ date: getDetailsEvent()?.date || 'TBD', attendeeIds: getDetailsEvent()?.attendeeIds || [] }]).map((occurrence, index) => {
-                const detailsEvent = getDetailsEvent();
-                const visibleCount = detailsEvent
-                  ? getVisibleAttendees(detailsEvent, occurrence.attendeeIds || []).length
-                  : 0;
-                const userGoing = (occurrence.attendeeIds || []).includes(CURRENT_USER_ID);
-
-                return (
-                  <View
-                    key={`${occurrence.id || index}-${occurrence.startAt || occurrence.date}`}
-                    style={[styles.occurrenceRow, { borderBottomColor: colors.border }]}
-                  >
-                    <View style={styles.occurrenceRowTop}>
-                      <Text style={[styles.occurrenceText, { color: colors.textPrimary }]}>
-                        {formatOccurrenceDate(occurrence)}
-                      </Text>
-                      <Text style={[styles.occurrenceCountText, { color: colors.textSecondary }]}>
-                        👥 {visibleCount} going
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.occurrenceGoingButton,
-                        {
-                          backgroundColor: userGoing ? colors.primary : colors.backgroundSecondary,
-                          borderColor: userGoing ? colors.primary : colors.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        if (detailsEvent) {
-                          toggleOccurrenceInterest(detailsEvent, occurrence);
-                        }
-                      }}
-                      activeOpacity={0.75}
-                    >
-                      <Text
-                        style={[
-                          styles.occurrenceGoingButtonText,
-                          { color: userGoing ? '#ffffff' : colors.textPrimary },
-                        ]}
-                      >
-                        {userGoing ? "I'm Going ✓" : "I'm Going"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
+      <BottomSheet
         visible={filtersVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setFiltersVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setFiltersVisible(false)}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Filters</Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                Genre, Times, People Attending, Location
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setFiltersVisible(false)}
-              >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalContent}>
-              <Text style={[styles.filterSectionTitle, { color: colors.textPrimary }]}>Genre</Text>
-              <View style={styles.filterOptionsWrap}>
-                {genreOptions.map((genre) => {
-                  const selected = genreFilters.includes(genre);
-                  return (
-                    <TouchableOpacity
-                      key={`genre-${genre}`}
-                      style={[
-                        styles.filterChip,
-                        {
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.primary : colors.card,
-                        },
-                      ]}
-                      onPress={() => toggleMultiSelectValue(setGenreFilters, genre)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          { color: selected ? '#ffffff' : colors.textPrimary },
-                        ]}
-                      >
-                        {prettyFilterLabel(genre)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.filterSectionTitle, { color: colors.textPrimary }]}>Times</Text>
-              <View style={styles.filterOptionsWrap}>
-                {timesOptions.map((option) => {
-                  const selected = timeFilters.includes(option.id);
-                  return (
-                    <TouchableOpacity
-                      key={`times-${option.id}`}
-                      style={[
-                        styles.filterChip,
-                        {
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.primary : colors.card,
-                        },
-                      ]}
-                      onPress={() => toggleMultiSelectValue(setTimeFilters, option.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          { color: selected ? '#ffffff' : colors.textPrimary },
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.filterSectionTitle, { color: colors.textPrimary }]}>People Attending</Text>
-              <View style={styles.filterOptionsWrap}>
-                {peopleOptions.map((option) => {
-                  const selected = peopleFilters.includes(option.value);
-                  return (
-                    <TouchableOpacity
-                      key={`people-${option.value}`}
-                      style={[
-                        styles.filterChip,
-                        {
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.primary : colors.card,
-                        },
-                      ]}
-                      onPress={() => toggleMultiSelectValue(setPeopleFilters, option.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          { color: selected ? '#ffffff' : colors.textPrimary },
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.filterSectionTitle, { color: colors.textPrimary }]}>Location</Text>
-              <View style={styles.filterOptionsWrap}>
-                {locationOptions.map((locationOption) => {
-                  const selected = locationFilters.includes(locationOption);
-                  return (
-                    <TouchableOpacity
-                      key={`location-${locationOption}`}
-                      style={[
-                        styles.filterChip,
-                        {
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.primary : colors.card,
-                        },
-                      ]}
-                      onPress={() => toggleMultiSelectValue(setLocationFilters, locationOption)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          { color: selected ? '#ffffff' : colors.textPrimary },
-                        ]}
-                      >
-                        {prettyFilterLabel(locationOption)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            <View style={styles.filterActionsRow}>
-              <TouchableOpacity
-                style={[styles.calendarActionButton, { borderColor: colors.border }]}
-                onPress={clearAllFilters}
-              >
-                <Text style={[styles.calendarActionButtonText, { color: colors.textPrimary }]}>Clear All</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.calendarActionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                onPress={() => setFiltersVisible(false)}
-              >
-                <Text style={[styles.calendarActionButtonText, { color: '#ffffff' }]}>Apply</Text>
-              </TouchableOpacity>
-            </View>
+        onClose={() => setFiltersVisible(false)}
+        title="Filters"
+        subtitle="Genre, times, people attending, location"
+        footer={
+          <View style={styles.sheetActions}>
+            <Button
+              label="Clear all"
+              variant="secondary"
+              onPress={clearAllFilters}
+              style={styles.sheetAction}
+            />
+            <Button
+              label="Apply"
+              onPress={() => setFiltersVisible(false)}
+              style={styles.sheetAction}
+            />
           </View>
-        </View>
-      </Modal>
+        }
+      >
+        <ScrollView style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
+          {[
+            {
+              title: 'Genre',
+              options: genreOptions.map((genre) => ({ id: genre, label: prettyFilterLabel(genre) })),
+              selected: genreFilters,
+              setter: setGenreFilters,
+            },
+            {
+              title: 'Times',
+              options: timesOptions,
+              selected: timeFilters,
+              setter: setTimeFilters,
+            },
+            {
+              title: 'People attending',
+              options: peopleOptions.map((option) => ({ id: option.value, label: option.label })),
+              selected: peopleFilters,
+              setter: setPeopleFilters,
+            },
+            {
+              title: 'Location',
+              options: locationOptions.map((location) => ({
+                id: location,
+                label: prettyFilterLabel(location),
+              })),
+              selected: locationFilters,
+              setter: setLocationFilters,
+            },
+          ].map((section) => (
+            <View key={section.title} style={styles.filterSection}>
+              <Text style={[styles.filterSectionTitle, { color: colors.textPrimary }]}>
+                {section.title}
+              </Text>
+              {section.options.length > 0 ? (
+                <View style={styles.filterOptionsWrap}>
+                  {section.options.map((option) => (
+                    <Chip
+                      key={`${section.title}-${option.id}`}
+                      label={option.label}
+                      selected={section.selected.includes(option.id)}
+                      onPress={() => toggleMultiSelectValue(section.setter, option.id)}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.filterEmptyText, { color: colors.textTertiary }]}>
+                  Nothing to filter on yet.
+                </Text>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      </BottomSheet>
 
-      {/* Attendees Modal */}
-      <Modal
+      <BottomSheet
         visible={modalVisible !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeAttendeesModal}
+        onClose={closeAttendeesModal}
+        title={getCurrentEvent()?.title || 'Event'}
+        subtitle="People going"
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeAttendeesModal}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                {getCurrentEvent()?.title}
-              </Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                People Going
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={closeAttendeesModal}
-              >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView 
-              style={styles.attendeesList} 
-              contentContainerStyle={styles.attendeesListContent}
-              showsVerticalScrollIndicator={true}
-            >
-              {(() => {
-                const currentEvent = getCurrentEvent();
-                const visibleAttendees = currentEvent ? getVisibleAttendees(currentEvent) : [];
-                return visibleAttendees.length > 0 ? (
-                  visibleAttendees.map((attendee) => (
-                    <View key={attendee.id} style={[styles.attendeeItem, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.attendeeAvatar, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.attendeeAvatarText}>{attendee.avatar}</Text>
-                      </View>
-                      <Text style={[styles.attendeeName, { color: colors.textPrimary }]}>
-                        {attendee.name}
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                      No attendees yet
-                    </Text>
-                  </View>
-                );
-              })()}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </View>
+        <ScrollView
+          style={styles.attendeesList}
+          contentContainerStyle={styles.attendeesListContent}
+          showsVerticalScrollIndicator
+        >
+          {(() => {
+            const currentEvent = getCurrentEvent();
+            const visibleAttendees = currentEvent ? getVisibleAttendees(currentEvent) : [];
+
+            if (visibleAttendees.length === 0) {
+              return (
+                <EmptyState
+                  icon="👥"
+                  title="Nobody yet"
+                  message="Be the first from your network to say you're going."
+                />
+              );
+            }
+
+            return visibleAttendees.map((attendee) => (
+              <PersonRow
+                key={attendee.id}
+                name={attendee.name}
+                subtitle={attendee.isCurrentUser ? 'You' : attendee.city}
+                connectors={attendee.connectors}
+                onPress={
+                  attendee.isCurrentUser
+                    ? undefined
+                    : () => {
+                        closeAttendeesModal();
+                        navigation.navigate('FriendProfile', { userId: attendee.id });
+                      }
+                }
+                onMessage={
+                  attendee.isCurrentUser
+                    ? undefined
+                    : () => {
+                        // Close first — otherwise the sheet stays up over the Chat tab.
+                        closeAttendeesModal();
+                        openDirectMessage(attendee.id);
+                      }
+                }
+              />
+            ));
+          })()}
+        </ScrollView>
+      </BottomSheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  dateRangeButton: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-  },
-  dateRangeButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  filterButton: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-  },
-  filterButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  filterChip: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    alignSelf: 'flex-start',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '600',
+  headerControls: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   content: {
     flex: 1,
-    padding: 20,
+  },
+  contentContainer: {
+    padding: 24,
+    paddingBottom: 48,
   },
   loadingState: {
     paddingVertical: 16,
@@ -1341,226 +1110,124 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   fetchErrorText: {
     marginBottom: 12,
     fontSize: 13,
     fontWeight: '500',
+    textAlign: 'center',
   },
   eventCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 12,
   },
   eventCardTop: {
     flexDirection: 'row',
   },
-  eventDetailsTapArea: {
-    flexDirection: 'row',
-    flex: 1,
-  },
   eventIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f0fdfa',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   eventIcon: {
-    fontSize: 32,
+    fontSize: 22,
   },
   eventContent: {
     flex: 1,
+    minWidth: 0,
   },
   eventTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  eventLocation: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  eventDetails: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 6,
-  },
-  eventDate: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  eventAttendees: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  multiTimeText: {
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  eventHost: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 4,
-  },
-  emptyState: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyStateText: {
     fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    marginBottom: 4,
   },
-  modalOverlay: {
+  eventMeta: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  eventTagRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  eventTag: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  eventAction: {
+    marginTop: 14,
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  sheetAction: {
     flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    maxHeight: '80%',
-    minHeight: '40%',
-    flexDirection: 'column',
   },
   calendarContainer: {
     paddingHorizontal: 14,
     paddingTop: 10,
+    paddingBottom: 6,
   },
-  calendarActions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+  filterScroll: {
+    flexGrow: 0,
+  },
+  filterContent: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
     paddingBottom: 20,
   },
-  calendarActionButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarActionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  filterModalScroll: {
-    flex: 1,
-  },
-  filterModalContent: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 18,
+  filterSection: {
+    marginBottom: 18,
   },
   filterSectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    marginTop: 10,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   filterOptionsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  filterActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    position: 'relative',
-    flexShrink: 0,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
+  filterEmptyText: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  modalCloseButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
   detailsScroll: {
-    flex: 1,
+    flexGrow: 0,
   },
   detailsContent: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 26,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
   detailsImage: {
     width: '100%',
-    height: 190,
+    height: 180,
     borderRadius: 12,
-    marginBottom: 14,
-    backgroundColor: '#e2e8f0',
+    marginBottom: 16,
   },
   detailsSectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     marginBottom: 6,
+    marginTop: 4,
   },
   detailsDescription: {
     fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 18,
   },
   occurrenceRow: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   occurrenceRowTop: {
     flexDirection: 'row',
@@ -1570,73 +1237,19 @@ const styles = StyleSheet.create({
   },
   occurrenceText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     flex: 1,
   },
   occurrenceCountText: {
     fontSize: 12,
-    fontWeight: '500',
-  },
-  occurrenceGoingButton: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  occurrenceGoingButtonText: {
-    fontSize: 13,
     fontWeight: '600',
   },
   attendeesList: {
-    flex: 1,
-    flexGrow: 1,
+    flexGrow: 0,
   },
   attendeesListContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  attendeeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  attendeeAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  attendeeAvatarText: {
-    fontSize: 20,
-  },
-  attendeeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  interestedButton: {
-    marginTop: 12,
-    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  interestedButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    paddingTop: 8,
+    paddingBottom: 28,
   },
 });
-
-
