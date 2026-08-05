@@ -368,6 +368,22 @@ export default function ConnectionsEventsScreen() {
                       <Text style={[styles.eventHost, { color: colors.textSecondary }]} numberOfLines={1}>
                         {isUserEvent ? 'You' : hostName}
                       </Text>
+                      {!isUserEvent ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            openDirectMessage(event.hostId, {
+                              kind: 'event',
+                              label: 'posting',
+                              eventTitle: event.title,
+                            })
+                          }
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Message ${hostName} about ${event.title}`}
+                        >
+                          <Text style={styles.eventHostMessage}>💬</Text>
+                        </TouchableOpacity>
+                      ) : null}
                       <Text style={styles.eventTypeIcon}>{getEventIcon(event.type)}</Text>
                     </View>
                     <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
@@ -466,8 +482,14 @@ export default function ConnectionsEventsScreen() {
                 }}
                 onMessage={() => {
                   // Close first — otherwise the sheet stays up over the Chat tab.
+                  const event = getCurrentEvent();
+                  const hosted = event && attendee.id === event.hostId;
                   closeAttendeesModal();
-                  openDirectMessage(attendee.id);
+                  openDirectMessage(attendee.id, {
+                    kind: 'event',
+                    label: hosted ? 'posting' : 'going to',
+                    eventTitle: event?.title,
+                  });
                 }}
               />
             ));
@@ -576,6 +598,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
+  },
+  eventHostMessage: {
+    fontSize: 13,
+    marginLeft: 8,
   },
   eventTypeIcon: {
     fontSize: 16,

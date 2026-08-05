@@ -82,11 +82,23 @@ export const ChatProvider = ({ children }) => {
    * Safe to call during a press handler and navigate with the result straight
    * away — the id doesn't depend on the state update landing first.
    */
-  const openDirectConversation = useCallback((userId) => {
+  /**
+   * `context` describes what prompted the chat, e.g.
+   * `{ kind: 'event', label: 'going to', eventTitle: 'Hamilton' }`.
+   * Starting a DM from an event carries one; starting it from a profile doesn't.
+   * The newest context wins so the banner reflects why you're here right now.
+   */
+  const openDirectConversation = useCallback((userId, context = null) => {
     const id = directConversationId(userId);
 
     setConversations((prev) => {
-      if (prev.some((item) => item.id === id)) return prev;
+      const existing = prev.find((item) => item.id === id);
+
+      if (existing) {
+        if (!context) return prev;
+        return prev.map((item) => (item.id === id ? { ...item, context } : item));
+      }
+
       return [
         {
           id,
@@ -96,6 +108,7 @@ export const ChatProvider = ({ children }) => {
           createdAt: Date.now(),
           unread: 0,
           messages: [],
+          context,
         },
         ...prev,
       ];

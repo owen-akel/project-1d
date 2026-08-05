@@ -165,6 +165,34 @@ export default function ConversationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        {/* Why this chat was started — only set when it came from an event. */}
+        {conversation.context?.eventTitle ? (
+          <View
+            style={[
+              styles.contextBanner,
+              {
+                backgroundColor: colors.primaryMuted,
+                borderLeftColor: colors.primary,
+                marginHorizontal: spacing.lg,
+                marginTop: spacing.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm + 2,
+                borderRadius: radius.sm,
+              },
+            ]}
+          >
+            <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>
+              Replying to you {conversation.context.label || 'going to'}
+            </Text>
+            <Text
+              style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}
+              numberOfLines={2}
+            >
+              {conversation.context.eventTitle}
+            </Text>
+          </View>
+        ) : null}
+
         {conversation.messages.length === 0 ? (
           <View style={styles.flex}>
             <EmptyState
@@ -261,6 +289,9 @@ const styles = StyleSheet.create({
   },
   bubble: {
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  contextBanner: {
+    borderLeftWidth: 3,
   },
   composer: {
     flexDirection: 'row',

@@ -22,10 +22,14 @@ export default function useOpenChat() {
   const navigation = useNavigation();
   const { openDirectConversation } = useChat();
 
+  /**
+   * `context` is optional and describes why the chat is being opened — an event
+   * they're going to, or one they posted. Messaging from a profile passes none.
+   */
   const openDirectMessage = useCallback(
-    (userId) => {
+    (userId, context = null) => {
       if (!userId) return;
-      const conversationId = openDirectConversation(userId);
+      const conversationId = openDirectConversation(userId, context);
       navigation.navigate('Chat', toConversation(conversationId));
     },
     [navigation, openDirectConversation]

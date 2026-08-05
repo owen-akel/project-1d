@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
@@ -41,7 +40,7 @@ import {
 } from '../src/ui';
 
 export default function ProfileScreen() {
-  const { colors, spacing, radius, typography, isDarkMode, toggleDarkMode } = useTheme();
+  const { colors, spacing, radius, typography } = useTheme();
   const navigation = useNavigation();
   const { friends, removeFriend, pendingRequestCount } = useFriends();
   const { user, updateUser, setResidence } = useUser();
@@ -334,20 +333,15 @@ export default function ProfileScreen() {
             )}
           </Card>
 
-          <Card style={{ marginTop: spacing.lg }}>
+          <Card style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate('Settings')}>
             <View style={styles.cardHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={[typography.heading, { color: colors.textPrimary }]}>Dark mode</Text>
+                <Text style={[typography.heading, { color: colors.textPrimary }]}>⚙️  Settings</Text>
                 <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-                  {isDarkMode ? 'On' : 'Off'}
+                  Appearance, notifications, privacy, account
                 </Text>
               </View>
-              <Switch
-                value={isDarkMode}
-                onValueChange={toggleDarkMode}
-                trackColor={{ true: colors.primary, false: colors.borderStrong }}
-                thumbColor={colors.card}
-              />
+              <Text style={[typography.body, { color: colors.textTertiary }]}>›</Text>
             </View>
           </Card>
         </ScrollView>

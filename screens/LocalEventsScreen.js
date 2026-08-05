@@ -15,7 +15,12 @@ import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
 import { getMajorEventsByCity } from '../src/mock/events';
 import { USERS_BY_ID, getUsersByCity } from '../src/mock/users';
-import { canViewUser, toMockCityName, CURRENT_USER_ID } from '../src/social/visibility';
+import {
+  canViewUser,
+  toMockCityName,
+  getVisibleUserIdsByCity,
+  CURRENT_USER_ID,
+} from '../src/social/visibility';
 import { getConnectorFriends } from '../src/social/connections';
 import useOpenChat from '../src/hooks/useOpenChat';
 import {
@@ -109,6 +114,35 @@ const parseEventDate = (event) => {
     if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return parseLegacyRelativeDate(event?.date);
+};
+
+/** Stable 32-bit hash so a given event always seeds the same crowd. */
+const hashString = (value) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+};
+
+/**
+ * Ticketmaster has no idea who from your network is going, so live events arrive
+ * with empty attendee lists and every card reads "0 going". Seed each showing
+ * deterministically from the people you can see in that city — same event, same
+ * faces, every time.
+ */
+const seedAttendees = (seedKey, pool) => {
+  if (!pool || pool.length === 0) return [];
+
+  const hash = hashString(seedKey);
+  const count = hash % Math.min(pool.length + 1, 10);
+  const picked = new Set();
+
+  for (let index = 0; index < count; index += 1) {
+    picked.add(pool[(hash + index * 7919) % pool.length]);
+  }
+
+  return Array.from(picked);
 };
 
 const getOccurrenceKey = (eventId, occurrence) => {
@@ -366,36 +400,51 @@ export default function LocalEventsScreen() {
   // Track which events the user is interested in (using event IDs)
   const [interestedEvents, setInterestedEvents] = useState(new Set());
 
+  // People from your network who live in this city — the pool live events draw
+  // their attendees from.
+  const attendeePool = useMemo(() => {
+    if (!user?.residence) return [];
+    return getVisibleUserIdsByCity(toMockCityName(user.residence), friends);
+  }, [user?.residence, friends]);
+
   const sourceEvents = useMemo(() => {
-    const normalizeEvent = (event) => ({
-      ...event,
-      genre: event.genre || event.type || 'Other',
-      segment: event.segment || event.type || 'Event',
-      isMajor: event.isMajor !== undefined ? event.isMajor : true,
-      attractionIds: event.attractionIds || [],
-      occurrences:
-        event.occurrences && event.occurrences.length > 0
-          ? event.occurrences.map((occurrence) => ({
-              ...occurrence,
-              attendeeIds: occurrence.attendeeIds || event.attendeeIds || [],
-            }))
-          : [
-              {
-                id: event.id,
-                startAt: event.startAt || null,
-                date: event.date || 'TBD',
-                url: event.url || null,
-                attendeeIds: event.attendeeIds || [],
-              },
-            ],
-    });
+    const normalizeEvent = (event) => {
+      const withSeed = (occurrenceId, existing) =>
+        existing && existing.length > 0 ? existing : seedAttendees(occurrenceId, attendeePool);
+
+      return {
+        ...event,
+        genre: event.genre || event.type || 'Other',
+        segment: event.segment || event.type || 'Event',
+        isMajor: event.isMajor !== undefined ? event.isMajor : true,
+        attractionIds: event.attractionIds || [],
+        occurrences:
+          event.occurrences && event.occurrences.length > 0
+            ? event.occurrences.map((occurrence) => ({
+                ...occurrence,
+                attendeeIds: withSeed(
+                  `${event.id}:${occurrence.id || occurrence.startAt || occurrence.date}`,
+                  occurrence.attendeeIds || event.attendeeIds
+                ),
+              }))
+            : [
+                {
+                  id: event.id,
+                  startAt: event.startAt || null,
+                  date: event.date || 'TBD',
+                  url: event.url || null,
+                  attendeeIds: withSeed(event.id, event.attendeeIds),
+                },
+              ],
+      };
+    };
 
     const normalizedSource = eventsError
       ? fallbackEvents.map(normalizeEvent)
       : liveEvents.map(normalizeEvent);
 
     return mergeEventsForDisplay(normalizedSource);
-  }, [eventsError, liveEvents, fallbackEvents]);
+  }, [eventsError, liveEvents, fallbackEvents, attendeePool]);
 
   // Get events with current attendee state
   const events = useMemo(() => {
@@ -1077,8 +1126,13 @@ export default function LocalEventsScreen() {
                     ? undefined
                     : () => {
                         // Close first — otherwise the sheet stays up over the Chat tab.
+                        const event = getCurrentEvent();
                         closeAttendeesModal();
-                        openDirectMessage(attendee.id);
+                        openDirectMessage(attendee.id, {
+                          kind: 'event',
+                          label: 'going to',
+                          eventTitle: event?.title,
+                        });
                       }
                 }
               />

@@ -20,6 +20,8 @@ import ChatScreen from './screens/ChatScreen';
 import NewChatScreen from './screens/NewChatScreen';
 import ConversationScreen from './screens/ConversationScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import ProfileSetupScreen from './screens/ProfileSetupScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 import FriendRequestsScreen from './screens/FriendRequestsScreen';
 import InviteContactsScreen from './screens/InviteContactsScreen';
@@ -86,6 +88,7 @@ function ProfileStackNavigator() {
       <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
       <Stack.Screen name="FriendRequests" component={FriendRequestsScreen} />
       <Stack.Screen name="InviteContacts" component={InviteContactsScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }
@@ -243,7 +246,9 @@ function AppNavigator() {
     >
       <Stack.Screen name="Launch" component={LaunchScreen} />
       <Stack.Screen name="Auth" component={AuthScreen} />
-      {/* Shown once right after sign-in, before the tabs. */}
+      {/* Sign-up onboarding: profile, then contacts, then the tabs.
+          Logging in skips both and goes straight to Main. */}
+      <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen
         name="InviteContacts"
         component={InviteContactsScreen}

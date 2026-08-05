@@ -15,8 +15,12 @@ import { Button, SegmentedControl } from '../src/ui';
 
 /**
  * iOS offers AutoFill on anything it recognises as a credential field, which
- * drops a blank strong-password sheet over the form and prompts to save on
- * submit. There's no real account backing this screen yet, so opt out.
+ * drops a blank strong-password sheet over the form while you type. There's no
+ * real account backing this screen yet, so opt out.
+ *
+ * Note this does *not* stop the OS "Save Password?" sheet after submitting —
+ * that's driven by `secureTextEntry` and isn't suppressible from React Native.
+ * It'll disappear once this screen talks to a real auth backend.
  */
 const NO_AUTOFILL = {
   textContentType: 'none',
@@ -48,8 +52,14 @@ export default function AuthScreen({ navigation }) {
     }
 
     // In a real app, this would authenticate with a backend.
-    // Offer the contact invite step before dropping into the tabs.
-    navigation.replace('InviteContacts', { onboarding: true });
+    if (isLogin) {
+      // Returning users go straight in — no onboarding prompts.
+      navigation.replace('Main');
+      return;
+    }
+
+    // New accounts: profile setup, then contacts, then the app.
+    navigation.replace('ProfileSetup', { name: name.trim() });
   };
 
   const fieldStyle = [
@@ -175,10 +185,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    // No `justifyContent: center` here: the sign-up variant is taller than the
+    // viewport, and centring clips the bottom fields out of reach.
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: 48,
+    paddingBottom: 48,
   },
   logoContainer: {
     alignItems: 'center',
