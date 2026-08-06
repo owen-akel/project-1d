@@ -11,3 +11,6 @@ export { default as SearchInput } from './SearchInput';
 export { default as PersonRow } from './PersonRow';
 export { default as BottomSheet } from './BottomSheet';
 export { default as ConnectionWeb } from './ConnectionWeb';
+export { default as EventBackdrop } from './EventBackdrop';
+export { default as ReplyContext } from './ReplyContext';
+export { default as EventDetailsSheet } from './EventDetailsSheet';

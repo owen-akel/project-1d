@@ -10,6 +10,7 @@ import {
   getConnectorFriends,
 } from '../src/social/connections';
 import useOpenChat from '../src/hooks/useOpenChat';
+import { useSettings } from '../context/SettingsContext';
 import {
   Screen,
   ScreenHeader,
@@ -46,6 +47,7 @@ export default function FriendRequestsScreen() {
   } = useFriends();
 
   const { openDirectMessage } = useOpenChat();
+  const { settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState(route.params?.tab || 'incoming');
   const [query, setQuery] = useState('');
@@ -89,7 +91,9 @@ export default function FriendRequestsScreen() {
       ...incomingRequests.map((request) => request.userId),
       ...outgoingRequests.map((request) => request.userId),
     ];
-    const people = getSuggestedPeople(friends, pendingIds);
+    const people = getSuggestedPeople(friends, pendingIds, {
+      discoverable: settings.discoverable,
+    });
 
     const search = query.trim().toLowerCase();
     const matched = search
@@ -105,7 +109,7 @@ export default function FriendRequestsScreen() {
       mutualCount: getMutualFriendCount(person.id, friends),
       connectors: getConnectorFriends(person.id, friends),
     }));
-  }, [friends, incomingRequests, outgoingRequests, query]);
+  }, [friends, incomingRequests, outgoingRequests, query, settings.discoverable]);
 
   const mutualLabel = (count) =>
     count > 0 ? `${count} mutual ${count === 1 ? 'friend' : 'friends'}` : 'No mutual friends';
@@ -231,7 +235,9 @@ export default function FriendRequestsScreen() {
             icon="🔍"
             title="No one found"
             message={
-              query
+              !settings.discoverable
+                ? 'Discovery is off in Settings, so nobody is shown here.'
+                : query
                 ? `Nobody matches “${query}”.`
                 : "You've already connected with everyone here."
             }

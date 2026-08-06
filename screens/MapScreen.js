@@ -17,8 +17,32 @@ import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
 import { canViewUser, toMockCityName } from '../src/social/visibility';
 import { MAJOR_US_CITIES, findClosestCity } from '../src/data/cities';
+import useCityEvents from '../src/hooks/useCityEvents';
+import { Chip, EventDetailsSheet } from '../src/ui';
 
 const { width, height } = Dimensions.get('window');
+
+const toYmd = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/** "Today", "Tomorrow", then weekday + date for the rest of the week. */
+function buildDayOptions(days) {
+  return Array.from({ length: days }, (_, offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+
+    let label;
+    if (offset === 0) label = 'Today';
+    else if (offset === 1) label = 'Tomorrow';
+    else label = date.toLocaleDateString([], { weekday: 'short', day: 'numeric' });
+
+    return { value: toYmd(date), label };
+  });
+}
 const DEFAULT_REGION = {
   latitude: 40.7128,
   longitude: -74.0060,
@@ -39,6 +63,47 @@ export default function MapScreen() {
   const [currentCity, setCurrentCity] = useState('Loading...');
   const [currentCityCoords, setCurrentCityCoords] = useState(null);
   const geocodeTimeoutRef = useRef(null);
+
+  // Events for one day at a time, so the map stays readable.
+  const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
+  const [openEventId, setOpenEventId] = useState(null);
+
+  const dayOptions = useMemo(() => buildDayOptions(7), []);
+
+  const { events: dayEvents } = useCityEvents({
+    city: currentCity !== 'Loading...' ? currentCity : null,
+    startDate: selectedDay,
+    endDate: selectedDay,
+    friends,
+  });
+
+  // Not every venue comes back with coordinates, so anything missing gets
+  // scattered near the city centre rather than dropped from the map.
+  const mappedEvents = useMemo(() => {
+    if (!currentCityCoords) return [];
+
+    return dayEvents.map((event, index) => {
+      const hasCoords = Number.isFinite(event.latitude) && Number.isFinite(event.longitude);
+      if (hasCoords) {
+        return { ...event, coordinate: { latitude: event.latitude, longitude: event.longitude } };
+      }
+
+      const angle = (index / Math.max(dayEvents.length, 1)) * Math.PI * 2;
+      return {
+        ...event,
+        approximate: true,
+        coordinate: {
+          latitude: currentCityCoords.latitude + Math.cos(angle) * 0.045,
+          longitude: currentCityCoords.longitude + Math.sin(angle) * 0.055,
+        },
+      };
+    });
+  }, [dayEvents, currentCityCoords]);
+
+  const openEvent = useMemo(
+    () => mappedEvents.find((event) => event.id === openEventId) || null,
+    [mappedEvents, openEventId]
+  );
 
   // Count only the people in this city the current user is allowed to see
   // (friends + friends of friends).
@@ -245,7 +310,39 @@ export default function MapScreen() {
             />
           )}
 
+          {mappedEvents.map((event) => (
+            <Marker
+              key={event.id}
+              coordinate={event.coordinate}
+              onPress={() => setOpenEventId(event.id)}
+              tracksViewChanges={false}
+            >
+              <View style={[styles.eventPin, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+                <Text style={[styles.eventPinText, { color: colors.onPrimary }]}>
+                  {(event.attendeeIds || []).length || '•'}
+                </Text>
+              </View>
+            </Marker>
+          ))}
         </MapView>
+
+        {/* Day filter */}
+        <View style={styles.dayFilter} pointerEvents="box-none">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dayFilterContent}
+          >
+            {dayOptions.map((option) => (
+              <Chip
+                key={option.value}
+                label={option.label}
+                selected={selectedDay === option.value}
+                onPress={() => setSelectedDay(option.value)}
+              />
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Zoom Controls */}
         <View style={[styles.zoomControls, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -289,17 +386,49 @@ export default function MapScreen() {
           >
             <Text style={[styles.floatingCityName, { color: colors.textPrimary }]}>{currentCity}</Text>
             <Text style={[styles.floatingCityConnections, { color: colors.primary }]}>
-              {currentCityUsersCount} Connections
+              {currentCityUsersCount} connections · {mappedEvents.length} events
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
+      <EventDetailsSheet
+        visible={Boolean(openEvent)}
+        onClose={() => setOpenEventId(null)}
+        event={openEvent}
+        countAttendees={(occurrence) =>
+          (occurrence?.attendeeIds || openEvent?.attendeeIds || []).length
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  eventPin: {
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventPinText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  dayFilter: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
+  dayFilterContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -334,7 +463,7 @@ const styles = StyleSheet.create({
   zoomControls: {
     position: 'absolute',
     right: 20,
-    top: 20,
+    top: 72,
     width: 50,
     borderRadius: 18,
     borderWidth: 1,
@@ -424,8 +553,10 @@ const styles = StyleSheet.create({
   },
   floatingCityButton: {
     position: 'absolute',
-    top: 20,
+    bottom: 20,
     left: 20,
+    right: 20,
+    alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingHorizontal: 12,

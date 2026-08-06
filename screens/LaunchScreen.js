@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Image, Animated } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { BrandMark } from '../src/ui/icons';
 
 export default function LaunchScreen() {
   const navigation = useNavigation();
@@ -44,11 +45,7 @@ export default function LaunchScreen() {
           },
         ]}
       >
-        <Image
-          source={require('../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <BrandMark color={colors.primary} size={132} />
       </Animated.View>
     </View>
   );
@@ -63,10 +60,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logo: {
-    width: 150,
-    height: 150,
   },
 });
 

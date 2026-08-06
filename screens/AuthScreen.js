@@ -7,11 +7,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
   Alert,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Button, SegmentedControl } from '../src/ui';
+import { BrandMark } from '../src/ui/icons';
 
 /**
  * iOS offers AutoFill on anything it recognises as a credential field, which
@@ -84,7 +84,7 @@ export default function AuthScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.logoContainer, { marginBottom: spacing.xxl }]}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <BrandMark color={colors.primary} size={96} />
           <Text style={[typography.display, { color: colors.textPrimary, marginTop: spacing.md }]}>
             1D
           </Text>
@@ -193,10 +193,6 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-  },
-  logo: {
-    width: 78,
-    height: 78,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,

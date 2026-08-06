@@ -24,6 +24,8 @@ import {
 } from '../src/social/connections';
 import { canViewUser, CURRENT_USER_ID } from '../src/social/visibility';
 import useOpenChat from '../src/hooks/useOpenChat';
+import { GearIcon } from '../src/ui/icons';
+import { useSettings } from '../context/SettingsContext';
 import {
   Screen,
   Card,
@@ -45,6 +47,7 @@ export default function ProfileScreen() {
   const { friends, removeFriend, pendingRequestCount } = useFriends();
   const { user, updateUser, setResidence } = useUser();
   const { openDirectMessage } = useOpenChat();
+  const { settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState('profile');
   const [webCity, setWebCity] = useState('all');
@@ -252,11 +255,22 @@ export default function ProfileScreen() {
               accessibilityLabel="Change residence"
             >
               <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 3 }]}>
-                📍 {user.residence || 'Set residence'} ›
+                {settings.showCity ? `📍 ${user.residence || 'Set residence'}` : 'City hidden'} ›
               </Text>
             </TouchableOpacity>
           </View>
-          <Button label="Edit" variant="secondary" size="sm" onPress={openEditSheet} />
+          <View style={[styles.headerButtons, { gap: spacing.sm }]}>
+            <Button label="Edit" variant="secondary" size="sm" onPress={openEditSheet} />
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={[styles.gearButton, { backgroundColor: colors.backgroundSecondary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <GearIcon color={colors.textSecondary} size={19} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={[styles.identityActions, { marginTop: spacing.lg, gap: spacing.sm }]}>
@@ -333,17 +347,6 @@ export default function ProfileScreen() {
             )}
           </Card>
 
-          <Card style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate('Settings')}>
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[typography.heading, { color: colors.textPrimary }]}>⚙️  Settings</Text>
-                <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-                  Appearance, notifications, privacy, account
-                </Text>
-              </View>
-              <Text style={[typography.body, { color: colors.textTertiary }]}>›</Text>
-            </View>
-          </Card>
         </ScrollView>
       ) : (
         <ScrollView
@@ -857,6 +860,17 @@ const styles = StyleSheet.create({
   },
   identityActions: {
     flexDirection: 'row',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gearButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     flex: 1,

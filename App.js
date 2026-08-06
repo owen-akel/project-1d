@@ -1,7 +1,11 @@
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DarkTheme as NavigationDarkTheme,
+  DefaultTheme as NavigationLightTheme,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +14,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { FriendsProvider, useFriends } from './context/FriendsContext';
 import { UserProvider } from './context/UserContext';
 import { ChatProvider, useChat } from './context/ChatContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import LaunchScreen from './screens/LaunchScreen';
 import AuthScreen from './screens/AuthScreen';
 import LocalEventsScreen from './screens/LocalEventsScreen';
@@ -26,6 +31,7 @@ import FriendProfileScreen from './screens/FriendProfileScreen';
 import FriendRequestsScreen from './screens/FriendRequestsScreen';
 import InviteContactsScreen from './screens/InviteContactsScreen';
 import CityUsersScreen from './screens/CityUsersScreen';
+import { LocalIcon, ConnectionsIcon, ChatIcon, ProfileIcon, BrandMark } from './src/ui/icons';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -113,24 +119,15 @@ function TabNavigator() {
   const insets = useSafeAreaInsets();
   const { pendingRequestCount } = useFriends();
   const { totalUnread } = useChat();
+  const { settings } = useSettings();
 
-  const LogoIcon = ({ focused }) => (
-    <View style={styles.iconContainer}>
-      <Image
-        source={require('./assets/logo_light.png')}
-        style={[styles.logoIcon, { opacity: focused ? 1 : 0.55 }]}
-        resizeMode="contain"
-      />
-    </View>
-  );
+  // Notification preferences decide whether the badges show at all.
+  const showMessageBadge = settings.pushEnabled && settings.messageBadges;
+  const showRequestBadge = settings.pushEnabled && settings.requestBadges;
 
-  const TabIcon = ({ source, focused, color }) => (
+  const TabIcon = ({ Icon, focused, color }) => (
     <View style={styles.iconContainer}>
-      <Image
-        source={source}
-        style={[styles.tabIcon, { tintColor: focused ? color : colors.textTertiary }]}
-        resizeMode="contain"
-      />
+      <Icon color={focused ? color : colors.textTertiary} size={25} active={focused} />
     </View>
   );
 
@@ -167,11 +164,7 @@ function TabNavigator() {
         options={{
           tabBarLabel: 'Local',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              source={require('./assets/local_page_icon.png')}
-              focused={focused}
-              color={color}
-            />
+            <TabIcon Icon={LocalIcon} focused={focused} color={color} />
           ),
         }}
       />
@@ -181,11 +174,7 @@ function TabNavigator() {
         options={{
           tabBarLabel: 'Connections',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              source={require('./assets/connections_page_icon.png')}
-              focused={focused}
-              color={color}
-            />
+            <TabIcon Icon={ConnectionsIcon} focused={focused} color={color} />
           ),
         }}
       />
@@ -194,7 +183,11 @@ function TabNavigator() {
         component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <LogoIcon focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconContainer}>
+              <BrandMark color={focused ? colors.primary : colors.textTertiary} size={30} />
+            </View>
+          ),
         }}
       />
       <Tab.Screen
@@ -202,13 +195,9 @@ function TabNavigator() {
         component={ChatStackNavigator}
         options={{
           tabBarLabel: 'Chat',
-          tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
+          tabBarBadge: showMessageBadge && totalUnread > 0 ? totalUnread : undefined,
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              source={require('./assets/chat_icon.png')}
-              focused={focused}
-              color={color}
-            />
+            <TabIcon Icon={ChatIcon} focused={focused} color={color} />
           ),
         }}
       />
@@ -217,13 +206,9 @@ function TabNavigator() {
         component={ProfileStackNavigator}
         options={{
           tabBarLabel: 'Profile',
-          tabBarBadge: pendingRequestCount > 0 ? pendingRequestCount : undefined,
+          tabBarBadge: showRequestBadge && pendingRequestCount > 0 ? pendingRequestCount : undefined,
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              source={require('./assets/profile_icon.png')}
-              focused={focused}
-              color={color}
-            />
+            <TabIcon Icon={ProfileIcon} focused={focused} color={color} />
           ),
         }}
       />
@@ -234,6 +219,31 @@ function TabNavigator() {
 function ThemedStatusBar() {
   const { isDarkMode } = useTheme();
   return <StatusBar style={isDarkMode ? 'light' : 'dark'} />;
+}
+
+/**
+ * React Navigation paints its own background behind screens and during
+ * transitions. Left on its light default it flashes pale behind the dark UI, so
+ * feed it the app palette.
+ */
+function ThemedNavigationContainer({ children }) {
+  const { colors, isDarkMode } = useTheme();
+  const base = isDarkMode ? NavigationDarkTheme : NavigationLightTheme;
+
+  const theme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      background: colors.backgroundSecondary,
+      card: colors.background,
+      text: colors.textPrimary,
+      border: colors.border,
+      notification: colors.primary,
+    },
+  };
+
+  return <NavigationContainer theme={theme}>{children}</NavigationContainer>;
 }
 
 function AppNavigator() {
@@ -265,12 +275,14 @@ export default function App() {
       <ThemeProvider>
         <UserProvider>
           <FriendsProvider>
-            <ChatProvider>
-              <NavigationContainer>
+            <SettingsProvider>
+              <ChatProvider>
+              <ThemedNavigationContainer>
                 <ThemedStatusBar />
                 <AppNavigator />
-              </NavigationContainer>
-            </ChatProvider>
+              </ThemedNavigationContainer>
+              </ChatProvider>
+            </SettingsProvider>
           </FriendsProvider>
         </UserProvider>
       </ThemeProvider>
@@ -284,13 +296,5 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  logoIcon: {
-    width: 30,
-    height: 30,
-  },
-  tabIcon: {
-    width: 26,
-    height: 26,
   },
 });

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
+import { useSettings } from '../context/SettingsContext';
 import { Screen, ScreenHeader, Card, Button, Avatar } from '../src/ui';
 
 const APP_VERSION = '1.0.0';
@@ -13,15 +14,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation();
   const { user } = useUser();
   const { friends, pendingRequestCount } = useFriends();
-
-  // Local-only for now — there's no backend to persist preferences to yet.
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [requestAlerts, setRequestAlerts] = useState(true);
-  const [messageAlerts, setMessageAlerts] = useState(true);
-  const [eventReminders, setEventReminders] = useState(false);
-  const [discoverable, setDiscoverable] = useState(true);
-  const [showCity, setShowCity] = useState(true);
-  const [fofVisible, setFofVisible] = useState(true);
+  const { settings, setSetting, resetSettings } = useSettings();
 
   const notImplemented = (label) =>
     Alert.alert(label, 'Not wired up yet — this is a placeholder while there’s no backend.');
@@ -147,25 +140,26 @@ export default function SettingsScreen() {
         <Section title="Notifications">
           <Row
             label="Push notifications"
-            description="Master switch for everything below"
-            right={toggle(pushEnabled, setPushEnabled)}
+            description="Master switch — turning this off clears every badge"
+            right={toggle(settings.pushEnabled, (value) => setSetting('pushEnabled', value))}
           />
           <Row
-            label="Friend requests"
+            label="Friend request badges"
             description={
-              pendingRequestCount > 0 ? `${pendingRequestCount} waiting on you` : 'When someone adds you'
+              pendingRequestCount > 0
+                ? `${pendingRequestCount} waiting on you`
+                : 'Badge the profile tab when someone adds you'
             }
-            right={toggle(requestAlerts && pushEnabled, (v) => setRequestAlerts(v))}
+            right={toggle(settings.pushEnabled && settings.requestBadges, (value) =>
+              setSetting('requestBadges', value)
+            )}
           />
           <Row
-            label="Messages"
-            description="New direct messages and group chats"
-            right={toggle(messageAlerts && pushEnabled, (v) => setMessageAlerts(v))}
-          />
-          <Row
-            label="Event reminders"
-            description="An hour before something you're going to"
-            right={toggle(eventReminders && pushEnabled, (v) => setEventReminders(v))}
+            label="Message badges"
+            description="Badge the chat tab for unread messages"
+            right={toggle(settings.pushEnabled && settings.messageBadges, (value) =>
+              setSetting('messageBadges', value)
+            )}
             last
           />
         </Section>
@@ -173,18 +167,29 @@ export default function SettingsScreen() {
         <Section title="Privacy">
           <Row
             label="Discoverable"
-            description="Let friends of friends find you in search"
-            right={toggle(discoverable, setDiscoverable)}
+            description="Appear in Discover when people look for someone to add"
+            right={toggle(settings.discoverable, (value) => setSetting('discoverable', value))}
           />
           <Row
             label="Show my city"
-            description="Display your city on your profile"
-            right={toggle(showCity, setShowCity)}
+            description="Display your city on your profile and in lists"
+            right={toggle(settings.showCity, (value) => setSetting('showCity', value))}
           />
           <Row
-            label="Show friends of friends"
-            description="Let your friends see who you're connected to"
-            right={toggle(fofVisible, setFofVisible)}
+            label="Show my connections"
+            description="Let others see who you're connected to"
+            right={toggle(settings.showConnections, (value) => setSetting('showConnections', value))}
+            last
+          />
+        </Section>
+
+        <Section title="Content">
+          <Row
+            label="Event artwork"
+            description="Show artwork behind event cards"
+            right={toggle(settings.showEventBackdrops, (value) =>
+              setSetting('showEventBackdrops', value)
+            )}
             last
           />
         </Section>
@@ -214,10 +219,18 @@ export default function SettingsScreen() {
         </Section>
 
         <Button
+          label="Reset preferences"
+          variant="secondary"
+          fullWidth
+          style={{ marginTop: spacing.xl }}
+          onPress={resetSettings}
+        />
+
+        <Button
           label="Sign out"
           variant="danger"
           fullWidth
-          style={{ marginTop: spacing.xl }}
+          style={{ marginTop: spacing.sm }}
           onPress={confirmSignOut}
         />
 
@@ -232,7 +245,8 @@ export default function SettingsScreen() {
             },
           ]}
         >
-          Preferences are kept in memory for now and reset when the app reloads.
+          Appearance, notification and content settings take effect immediately.
+          Everything is kept in memory and resets when the app reloads.
         </Text>
       </ScrollView>
     </Screen>

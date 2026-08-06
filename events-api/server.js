@@ -90,11 +90,17 @@ const mapTicketmasterEvent = (event, fallbackCity) => {
   const localTime = event?.dates?.start?.localTime;
   const normalizedSegment = normalizeDedupValue(segmentName);
 
+  const latitude = Number(venue?.location?.latitude);
+  const longitude = Number(venue?.location?.longitude);
+
   return {
     id: event.id,
     title: event.name || 'Untitled Event',
     location: venue?.name || 'Unknown Venue',
     city: venue?.city?.name || fallbackCity,
+    // Passed through so the map can pin events at their actual venue.
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
     startAt,
     date: startAt || (localDate ? `${localDate}${localTime ? ` ${localTime}` : ''}` : 'TBD'),
     type: normalizeType(segmentName),
@@ -160,6 +166,8 @@ const groupEvents = (events) => {
     const firstOccurrence = mergedOccurrences[0];
     grouped.set(key, {
       ...existing,
+      latitude: existing.latitude ?? event.latitude,
+      longitude: existing.longitude ?? event.longitude,
       startAt: firstOccurrence?.startAt || existing.startAt,
       date: firstOccurrence?.date || existing.date,
       url: firstOccurrence?.url || existing.url,

@@ -26,6 +26,7 @@ import {
   EmptyState,
   PersonRow,
   BottomSheet,
+  EventBackdrop,
   getInitials,
 } from '../src/ui';
 
@@ -361,6 +362,7 @@ export default function ConnectionsEventsScreen() {
                   isUserEvent && { borderColor: colors.primary, borderWidth: 1 },
                 ]}
               >
+                <EventBackdrop event={event} height={180} width={340} />
                 <View style={styles.eventCardContent}>
                   <Avatar name={hostName} size="md" />
                   <View style={styles.eventContent}>
@@ -375,6 +377,7 @@ export default function ConnectionsEventsScreen() {
                               kind: 'event',
                               label: 'posting',
                               eventTitle: event.title,
+                              imageUrl: event.imageUrl || null,
                             })
                           }
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -489,6 +492,7 @@ export default function ConnectionsEventsScreen() {
                     kind: 'event',
                     label: hosted ? 'posting' : 'going to',
                     eventTitle: event?.title,
+                    imageUrl: event?.imageUrl || null,
                   });
                 }}
               />

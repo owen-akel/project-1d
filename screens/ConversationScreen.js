@@ -14,7 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useChat, parseDirectConversationId } from '../context/ChatContext';
 import { USERS_BY_ID } from '../src/mock/users';
 import { CURRENT_USER_ID } from '../src/social/visibility';
-import { Screen, ScreenHeader, Avatar, EmptyState } from '../src/ui';
+import { Screen, ScreenHeader, Avatar, EmptyState, ReplyContext } from '../src/ui';
 
 const formatTime = (timestamp) =>
   new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -86,14 +86,25 @@ export default function ConversationScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
+  // The first thing you sent is the actual reply, so the event card hangs off
+  // that bubble rather than floating at the top of the thread.
+  const firstOwnMessageId = conversation.messages.find(
+    (message) => message.senderId === CURRENT_USER_ID
+  )?.id;
+
   const renderMessage = ({ item, index }) => {
     const mine = item.senderId === CURRENT_USER_ID;
     const sender = mine ? null : USERS_BY_ID.get(item.senderId);
     const previous = conversation.messages[index - 1];
     const showSender =
       !mine && conversation.type === 'group' && previous?.senderId !== item.senderId;
+    const isReplyAnchor = mine && item.id === firstOwnMessageId && conversation.context;
 
     return (
+      <>
+        {isReplyAnchor ? (
+          <ReplyContext context={conversation.context} attached align="right" />
+        ) : null}
       <View style={[styles.messageRow, mine ? styles.mineRow : styles.theirsRow]}>
         {!mine && conversation.type === 'group' ? (
           <View style={styles.messageAvatar}>
@@ -138,6 +149,7 @@ export default function ConversationScreen() {
           </Text>
         </View>
       </View>
+      </>
     );
   };
 
@@ -165,36 +177,13 @@ export default function ConversationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {/* Why this chat was started — only set when it came from an event. */}
-        {conversation.context?.eventTitle ? (
-          <View
-            style={[
-              styles.contextBanner,
-              {
-                backgroundColor: colors.primaryMuted,
-                borderLeftColor: colors.primary,
-                marginHorizontal: spacing.lg,
-                marginTop: spacing.md,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm + 2,
-                borderRadius: radius.sm,
-              },
-            ]}
-          >
-            <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>
-              Replying to you {conversation.context.label || 'going to'}
-            </Text>
-            <Text
-              style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}
-              numberOfLines={2}
-            >
-              {conversation.context.eventTitle}
-            </Text>
-          </View>
-        ) : null}
-
         {conversation.messages.length === 0 ? (
           <View style={styles.flex}>
+            {conversation.context ? (
+              <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+                <ReplyContext context={conversation.context} align="right" />
+              </View>
+            ) : null}
             <EmptyState
               icon="👋"
               title={`Say hi to ${conversation.type === 'direct' ? title.split(' ')[0] : title}`}
@@ -210,6 +199,13 @@ export default function ConversationScreen() {
             contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+            ListFooterComponent={
+              // Thread already has messages but you haven't replied yet: park the
+              // event card where your reply is about to land.
+              conversation.context && !firstOwnMessageId ? (
+                <ReplyContext context={conversation.context} align="right" />
+              ) : null
+            }
           />
         )}
 

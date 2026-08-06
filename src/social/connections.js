@@ -158,7 +158,11 @@ export function getFriendsWithPeers(friendIds = []) {
  * friend and has no request in flight. Second-degree connections come first
  * since they share mutuals.
  */
-export function getSuggestedPeople(friendIds = [], excludedIds = []) {
+export function getSuggestedPeople(friendIds = [], excludedIds = [], { discoverable = true } = {}) {
+  // With discoverability off you can still reach direct suggestions, but the
+  // wider friends-of-friends pool stops surfacing you and vice versa.
+  if (!discoverable) return [];
+
   const excluded = new Set([...friendIds, ...excludedIds, CURRENT_USER_ID]);
 
   const secondDegreeIds = new Set(

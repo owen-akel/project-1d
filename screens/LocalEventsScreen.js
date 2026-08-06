@@ -22,6 +22,7 @@ import {
   CURRENT_USER_ID,
 } from '../src/social/visibility';
 import { getConnectorFriends } from '../src/social/connections';
+import { seedEventAttendees } from '../src/social/eventAttendees';
 import useOpenChat from '../src/hooks/useOpenChat';
 import {
   Screen,
@@ -32,6 +33,7 @@ import {
   EmptyState,
   PersonRow,
   BottomSheet,
+  EventBackdrop,
   getInitials,
 } from '../src/ui';
 
@@ -114,35 +116,6 @@ const parseEventDate = (event) => {
     if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return parseLegacyRelativeDate(event?.date);
-};
-
-/** Stable 32-bit hash so a given event always seeds the same crowd. */
-const hashString = (value) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-};
-
-/**
- * Ticketmaster has no idea who from your network is going, so live events arrive
- * with empty attendee lists and every card reads "0 going". Seed each showing
- * deterministically from the people you can see in that city — same event, same
- * faces, every time.
- */
-const seedAttendees = (seedKey, pool) => {
-  if (!pool || pool.length === 0) return [];
-
-  const hash = hashString(seedKey);
-  const count = hash % Math.min(pool.length + 1, 10);
-  const picked = new Set();
-
-  for (let index = 0; index < count; index += 1) {
-    picked.add(pool[(hash + index * 7919) % pool.length]);
-  }
-
-  return Array.from(picked);
 };
 
 const getOccurrenceKey = (eventId, occurrence) => {
@@ -410,7 +383,7 @@ export default function LocalEventsScreen() {
   const sourceEvents = useMemo(() => {
     const normalizeEvent = (event) => {
       const withSeed = (occurrenceId, existing) =>
-        existing && existing.length > 0 ? existing : seedAttendees(occurrenceId, attendeePool);
+        existing && existing.length > 0 ? existing : seedEventAttendees(occurrenceId, attendeePool);
 
       return {
         ...event,
@@ -846,6 +819,7 @@ export default function LocalEventsScreen() {
 
             return (
               <Card key={event.id} style={styles.eventCard} onPress={() => openDetailsModal(event.id)}>
+                <EventBackdrop event={event} height={190} width={340} />
                 <View style={styles.eventCardTop}>
                   <View style={[styles.eventIconContainer, { backgroundColor: colors.primaryMuted }]}>
                     <Text style={styles.eventIcon}>{getEventIcon(event.type)}</Text>
@@ -1132,6 +1106,7 @@ export default function LocalEventsScreen() {
                           kind: 'event',
                           label: 'going to',
                           eventTitle: event?.title,
+                          imageUrl: event?.imageUrl || null,
                         });
                       }
                 }
