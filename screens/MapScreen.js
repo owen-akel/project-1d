@@ -20,14 +20,12 @@ import { MAJOR_US_CITIES, findClosestCity } from '../src/data/cities';
 import useCityEvents from '../src/hooks/useCityEvents';
 import { eventCoordinate, personCoordinate } from '../src/social/placement';
 import {
-  Avatar,
   Button,
   BottomSheet,
-  Chip,
   EventDetailsSheet,
   SegmentedControl,
-  CategoryIcon,
 } from '../src/ui';
+import { PersonMarker, EventMarker } from '../src/ui/MapMarkers';
 
 const { width, height } = Dimensions.get('window');
 
@@ -343,45 +341,20 @@ export default function MapScreen() {
 
           {showPeople &&
             mappedPeople.map((person) => (
-              <Marker
+              <PersonMarker
                 key={`person-${person.id}`}
-                coordinate={person.coordinate}
+                person={person}
                 onPress={() => navigation.navigate('FriendProfile', { userId: person.id })}
-                tracksViewChanges={false}
-              >
-                <View style={[styles.personMarker, { borderColor: colors.background }]}>
-                  <Avatar name={person.name} size="sm" />
-                </View>
-              </Marker>
+              />
             ))}
 
           {showEvents &&
             mappedEvents.map((event) => (
-              <Marker
+              <EventMarker
                 key={`event-${event.id}`}
-                coordinate={event.coordinate}
+                event={event}
                 onPress={() => setOpenEventId(event.id)}
-                tracksViewChanges={false}
-              >
-                <View style={styles.eventMarker}>
-                  <View
-                    style={[
-                      styles.eventMarkerBody,
-                      { backgroundColor: colors.card, borderColor: colors.primary },
-                    ]}
-                  >
-                    <CategoryIcon type={event.type} color={colors.primary} size={18} />
-                    {(event.attendeeIds || []).length > 0 ? (
-                      <View style={[styles.eventMarkerCount, { backgroundColor: colors.primary }]}>
-                        <Text style={[styles.eventMarkerCountText, { color: colors.onPrimary }]}>
-                          {event.attendeeIds.length}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={[styles.eventMarkerStem, { backgroundColor: colors.primary }]} />
-                </View>
-              </Marker>
+              />
             ))}
         </MapView>
 
@@ -511,16 +484,37 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  dayFilter: {
+  controls: {
     position: 'absolute',
     top: 12,
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
+    gap: 8,
     zIndex: 5,
   },
-  dayFilterContent: {
-    paddingHorizontal: 16,
-    gap: 8,
+  dateButton: {
+    alignSelf: 'flex-start',
+  },
+  viewToggle: {
+    alignSelf: 'stretch',
+  },
+  dateSheet: {
+    flexGrow: 0,
+  },
+  dateSheetContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  dateRowText: {
+    fontSize: 15,
   },
   container: {
     flex: 1,
@@ -556,7 +550,8 @@ const styles = StyleSheet.create({
   zoomControls: {
     position: 'absolute',
     right: 20,
-    top: 72,
+    // Clears the date button and view toggle stacked above it.
+    top: 132,
     width: 50,
     borderRadius: 18,
     borderWidth: 1,

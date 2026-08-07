@@ -37,17 +37,23 @@ export function scatterAroundCity(seed, city, spreadKm = 6) {
   if (!center) return null;
 
   const hash = hashString(seed);
-  const angle = (hash % 1000) / 1000 * Math.PI * 2;
-  // sqrt keeps the distribution even across the disc instead of centre-heavy.
-  const distance = Math.sqrt(((hash >> 10) % 1000) / 1000) * spreadKm;
+  const angle = ((hash % 1000) / 1000) * Math.PI * 2;
+
+  // `>>>` matters: hashString returns an unsigned 32-bit value, and a signed
+  // `>>` turns anything above 2^31 negative — which then makes Math.sqrt NaN
+  // and hands the map a NaN coordinate it can't render.
+  const distance = Math.sqrt(((hash >>> 10) % 1000) / 1000) * spreadKm;
 
   const latitudeDelta = distance / 111;
   const longitudeDelta = distance / (111 * Math.cos((center.latitude * Math.PI) / 180));
 
-  return {
-    latitude: center.latitude + latitudeDelta * Math.sin(angle),
-    longitude: center.longitude + longitudeDelta * Math.cos(angle),
-  };
+  const latitude = center.latitude + latitudeDelta * Math.sin(angle);
+  const longitude = center.longitude + longitudeDelta * Math.cos(angle);
+
+  // Never hand a non-finite coordinate to the native map.
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  return { latitude, longitude };
 }
 
 /** Real venue coordinates when Ticketmaster gave us them, invented otherwise. */
