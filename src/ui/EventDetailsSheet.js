@@ -47,7 +47,7 @@ export default function EventDetailsSheet({
       visible={visible}
       onClose={onClose}
       title={event?.title || 'Event'}
-      subtitle={event?.location}
+      subtitle={event?.address || event?.location}
     >
       <ScrollView style={styles.scroll} contentContainerStyle={{ padding: spacing.xl }}>
         {event?.imageUrl ? (

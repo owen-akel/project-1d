@@ -79,7 +79,16 @@ export default function ConnectionWeb({
       const x = cx + innerRadius * Math.cos(angle);
       const y = cy + innerRadius * Math.sin(angle);
 
-      const peers = (friend.peers || []).slice(0, MAX_DOTS_PER_FRIEND);
+      const allPeers = friend.peers || [];
+
+      // With a filter on, the outer ring stops being a sample and starts being
+      // a tally: how many of this friend's connections are actually in the
+      // chosen city. Counting the full list, not the five we'd have drawn.
+      const litPeerCount = hasHighlight
+        ? allPeers.filter((peer) => highlightedIds.has(peer.id)).length
+        : 0;
+
+      const peers = allPeers.slice(0, MAX_DOTS_PER_FRIEND);
       const spread = (TAU / Math.max(shown.length, 1)) * 0.72;
       const dots = peers.map((peer, index) => {
         const offset = peers.length === 1 ? 0 : (index / (peers.length - 1) - 0.5) * spread;
@@ -91,9 +100,15 @@ export default function ConnectionWeb({
         };
       });
 
-      return { friend, x, y, angle, dots };
+      // Where the tally bubble sits when a filter is on.
+      const tally = {
+        x: cx + outerRadius * Math.cos(angle),
+        y: cy + outerRadius * Math.sin(angle),
+      };
+
+      return { friend, x, y, angle, dots, litPeerCount, tally, totalPeers: allPeers.length };
     });
-  }, [shown, angles, size, cx, cy]);
+  }, [shown, angles, size, cx, cy, hasHighlight, highlightedIds]);
 
   const focused = useMemo(() => {
     if (!focusedFriendId) return null;
@@ -267,10 +282,10 @@ export default function ConnectionWeb({
               opacity={0.6}
             />
 
-            {overview.map(({ friend, x, y, dots }) =>
-              dots.map(({ peer, x: dotX, y: dotY }) => {
-                const lit = isLit(peer.id);
-                return (
+            {/* No filter: a sample of each friend's connections as small dots. */}
+            {!hasHighlight &&
+              overview.map(({ friend, x, y, dots }) =>
+                dots.map(({ peer, x: dotX, y: dotY }) => (
                   <G
                     key={`${friend.id}-dot-${peer.id}`}
                     onPress={onOpenProfile ? () => onOpenProfile(peer.id) : undefined}
@@ -280,21 +295,46 @@ export default function ConnectionWeb({
                       y1={y}
                       x2={dotX}
                       y2={dotY}
-                      stroke={lit && hasHighlight ? colors.primary : colors.textTertiary}
+                      stroke={colors.textTertiary}
                       strokeWidth={1}
-                      opacity={lit ? (hasHighlight ? 0.5 : 0.35) : 0.12}
+                      opacity={0.35}
                     />
-                    <Circle
-                      cx={dotX}
-                      cy={dotY}
-                      r={lit && hasHighlight ? 6 : 3.5}
-                      fill={lit && hasHighlight ? colors.primary : colors.textTertiary}
-                      opacity={lit ? (hasHighlight ? 1 : 0.55) : 0.18}
+                    <Circle cx={dotX} cy={dotY} r={3.5} fill={colors.textTertiary} opacity={0.55} />
+                  </G>
+                ))
+              )}
+
+            {/* Filtered: one bubble per friend carrying their real count. */}
+            {hasHighlight &&
+              overview.map(({ friend, x, y, tally, litPeerCount }) => {
+                if (litPeerCount === 0) return null;
+                const radius = litPeerCount > 9 ? 11 : 9.5;
+
+                return (
+                  <G key={`${friend.id}-tally`}>
+                    <Line
+                      x1={x}
+                      y1={y}
+                      x2={tally.x}
+                      y2={tally.y}
+                      stroke={colors.primary}
+                      strokeWidth={1.4}
+                      opacity={0.6}
                     />
+                    <Circle cx={tally.x} cy={tally.y} r={radius} fill={colors.primary} />
+                    <SvgText
+                      x={tally.x}
+                      y={tally.y + 3.6}
+                      fontSize={10}
+                      fontWeight="700"
+                      fill={colors.onPrimary}
+                      textAnchor="middle"
+                    >
+                      {litPeerCount}
+                    </SvgText>
                   </G>
                 );
-              })
-            )}
+              })}
 
             {overview.map(({ friend, x, y }) => (
               <Line

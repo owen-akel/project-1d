@@ -287,6 +287,7 @@ export default function ConnectionsEventsScreen() {
           id: attendeeId,
           name,
           avatar: getInitials(name),
+          photoUrl: attendee?.photoUrl || null,
           city: attendee?.city,
           connectors: getConnectorFriends(attendeeId, friends),
         };
@@ -317,14 +318,14 @@ export default function ConnectionsEventsScreen() {
           events.map((event) => {
             const isInterested = interestedEvents.has(event.id);
             // Check if the host is the current user
-            let hostName, hostInitials;
+            let hostName, hostPhoto;
             if (event.hostId === CURRENT_USER_ID) {
               hostName = user?.name || 'You';
-              hostInitials = user?.name ? user.name.split(' ').map(n => n[0]).join('') : '👤';
+              hostPhoto = user?.photo || null;
             } else {
               const host = USERS_BY_ID.get(event.hostId);
               hostName = host?.name || 'Unknown';
-              hostInitials = host?.name ? host.name.split(' ').map(n => n[0]).join('') : '👤';
+              hostPhoto = host?.photoUrl || null;
             }
             const visibleAttendees = getVisibleAttendees(event);
             
@@ -340,7 +341,7 @@ export default function ConnectionsEventsScreen() {
               >
                 <EventBackdrop event={event} height={180} width={340} />
                 <View style={styles.eventCardContent}>
-                  <Avatar name={hostName} size="md" />
+                  <Avatar name={hostName} uri={hostPhoto} size="md" />
                   <View style={styles.eventContent}>
                     <View style={styles.eventHeader}>
                       <Text style={[styles.eventHost, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -453,6 +454,7 @@ export default function ConnectionsEventsScreen() {
               <PersonRow
                 key={attendee.id}
                 name={attendee.name}
+                avatarUri={attendee.photoUrl}
                 subtitle={attendee.city}
                 connectors={attendee.connectors}
                 onPress={() => {

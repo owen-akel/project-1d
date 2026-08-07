@@ -101,6 +101,17 @@ const mapTicketmasterEvent = (event, fallbackCity) => {
     // Passed through so the map can pin events at their actual venue.
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
+    // The postal address, both to show on the event and to geocode from when
+    // a venue comes back without coordinates.
+    address:
+      [
+        venue?.address?.line1,
+        venue?.city?.name,
+        venue?.state?.stateCode || venue?.state?.name,
+        venue?.postalCode,
+      ]
+        .filter(Boolean)
+        .join(', ') || null,
     startAt,
     date: startAt || (localDate ? `${localDate}${localTime ? ` ${localTime}` : ''}` : 'TBD'),
     type: normalizeType(segmentName),
@@ -168,6 +179,7 @@ const groupEvents = (events) => {
       ...existing,
       latitude: existing.latitude ?? event.latitude,
       longitude: existing.longitude ?? event.longitude,
+      address: existing.address ?? event.address,
       startAt: firstOccurrence?.startAt || existing.startAt,
       date: firstOccurrence?.date || existing.date,
       url: firstOccurrence?.url || existing.url,

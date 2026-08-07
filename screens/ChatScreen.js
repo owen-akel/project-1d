@@ -43,7 +43,7 @@ export default function ChatScreen() {
             </Text>
           </View>
         ) : (
-          <Avatar name={other?.name} size="md" tone="muted" />
+          <Avatar name={other?.name} uri={other?.photoUrl} size="md" tone="muted" />
         )}
 
         <View style={[styles.conversationContent, { marginLeft: spacing.md }]}>

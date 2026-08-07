@@ -737,6 +737,7 @@ export default function LocalEventsScreen() {
           id: attendeeId,
           name,
           avatar: getInitials(name),
+          photoUrl: attendee?.photoUrl || null,
           city: attendee?.city,
           isCurrentUser,
           connectors: isCurrentUser ? [] : getConnectorFriends(attendeeId, friends),
@@ -1049,6 +1050,7 @@ export default function LocalEventsScreen() {
               <PersonRow
                 key={attendee.id}
                 name={attendee.name}
+                avatarUri={attendee.photoUrl}
                 subtitle={attendee.isCurrentUser ? 'You' : attendee.city}
                 connectors={attendee.connectors}
                 onPress={

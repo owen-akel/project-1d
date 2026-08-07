@@ -1,15 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Image,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, Image, Alert } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Button, SegmentedControl } from '../src/ui';
 
@@ -74,14 +64,21 @@ export default function AuthScreen({ navigation }) {
   ];
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/*
+        No KeyboardAvoidingView here. With behavior="padding" it adds bottom
+        padding the height of the keyboard and paints it in the screen's own
+        background colour — a white slab in the light theme, a black one in the
+        dark theme — which is the box that appeared on first typing. The
+        ScrollView adjusts its own inset instead, which moves content without
+        painting anything.
+      */}
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { padding: spacing.xl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         <View style={[styles.logoContainer, { marginBottom: spacing.xxl }]}>
           <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
@@ -176,7 +173,7 @@ export default function AuthScreen({ navigation }) {
           style={{ marginTop: spacing.sm, paddingVertical: spacing.lg }}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

@@ -2,6 +2,15 @@
 
 import { ALL_INTERESTS } from '../data/interests';
 
+/**
+ * Stand-in profile photos.
+ *
+ * pravatar serves a fixed set of portraits keyed by whatever seed you hand it,
+ * so a given user always gets the same face. Avatar falls back to initials if
+ * the request fails, which keeps the app usable offline.
+ */
+const photoFor = (id) => `https://i.pravatar.cc/240?u=${encodeURIComponent(id)}`;
+
 // Fixed list of cities
 const CITIES = ['Boston', 'NYC', 'Chicago', 'LA', 'SF', 'Austin'];
 
@@ -36,11 +45,13 @@ const MAIN_USER_NAMES = [
 // Generate main users
 const mainUsers = MAIN_USER_NAMES.map((name, index) => {
   const firstName = name.split(' ')[0].toLowerCase();
+  const id = `main-user-${index + 1}`;
   return {
-    id: `main-user-${index + 1}`,
+    id,
     name,
     city: getCityForUserIndex(index),
     interests: getRandomInterests(),
+    photoUrl: photoFor(id),
   };
 });
 
@@ -50,11 +61,13 @@ mainUsers.forEach((mainUser, mainIndex) => {
   const firstName = mainUser.name.split(' ')[0].toLowerCase();
   for (let i = 1; i <= 12; i++) {
     const friendIndex = mainIndex * 12 + i - 1;
+    const id = `${firstName}-friend-${i}`;
     friendUsers.push({
-      id: `${firstName}-friend-${i}`,
+      id,
       name: `${mainUser.name.split(' ')[0]} Friend ${i}`,
       city: getCityForUserIndex(friendIndex + 12), // Offset to distribute cities
       interests: getRandomInterests(),
+      photoUrl: photoFor(id),
     });
   }
 });

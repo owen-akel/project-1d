@@ -517,6 +517,7 @@ export default function ProfileScreen() {
                   {index > 0 ? rowDivider : null}
                   <PersonRow
                     name={friend.name}
+                    avatarUri={friend.photoUrl}
                     subtitle={friend.city}
                     meta={
                       friend.mutualCount > 0
@@ -635,6 +636,7 @@ export default function ProfileScreen() {
                 {index > 0 ? rowDivider : null}
                 <PersonRow
                   name={person.name}
+                  avatarUri={person.photoUrl}
                   subtitle={(person.interests || []).slice(0, 3).join(' · ')}
                   meta={
                     degree === 1

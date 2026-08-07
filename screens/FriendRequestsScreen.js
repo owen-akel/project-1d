@@ -133,6 +133,7 @@ export default function FriendRequestsScreen() {
       <Card key={request.id} style={{ marginBottom: spacing.md }}>
         <PersonRow
           name={request.user.name}
+          avatarUri={request.user.photoUrl}
           subtitle={request.user.city}
           meta={`${mutualLabel(request.mutualCount)} · ${formatAge(request.createdAt)}`}
           connectors={request.connectors}
@@ -202,6 +203,7 @@ export default function FriendRequestsScreen() {
             ) : null}
             <PersonRow
               name={request.user.name}
+              avatarUri={request.user.photoUrl}
               subtitle={request.user.city}
               meta={`Sent ${formatAge(request.createdAt)}`}
               onPress={() => openProfile(request.user.id)}
@@ -258,6 +260,7 @@ export default function FriendRequestsScreen() {
               ) : null}
               <PersonRow
                 name={person.name}
+                avatarUri={person.photoUrl}
                 subtitle={person.city}
                 meta={mutualLabel(person.mutualCount)}
                 connectors={person.connectors}

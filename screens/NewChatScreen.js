@@ -141,7 +141,7 @@ export default function NewChatScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${entry.user.name}`}
               >
-                <Avatar name={entry.user.name} size="sm" connectors={entry.connectors} />
+                <Avatar name={entry.user.name} uri={entry.user.photoUrl} size="sm" connectors={entry.connectors} />
                 <View style={[styles.removeDot, { backgroundColor: colors.textTertiary, borderColor: colors.background }]}>
                   <Text style={[styles.removeDotText, { color: colors.background }]}>✕</Text>
                 </View>
@@ -215,6 +215,7 @@ export default function NewChatScreen() {
                   ) : null}
                   <PersonRow
                     name={entry.user.name}
+                    avatarUri={entry.user.photoUrl}
                     subtitle={entry.user.city}
                     meta={entry.degree === 1 ? 'Friend' : undefined}
                     connectors={entry.connectors}

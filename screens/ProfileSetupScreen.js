@@ -6,8 +6,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
@@ -103,16 +101,15 @@ export default function ProfileSetupScreen({ route }) {
         }
       />
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-      >
+      {/* Same reasoning as AuthScreen: padding-based avoidance paints a slab
+          of background colour where the keyboard sits. */}
+      <View style={styles.flex}>
         <ScrollView
           style={styles.body}
           contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxxl }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           <View style={[styles.avatarBlock, { marginBottom: spacing.xl }]}>
             <Avatar name={form.name || 'You'} size="xl" />
@@ -217,7 +214,7 @@ export default function ProfileSetupScreen({ route }) {
         >
           <Button label="Continue" onPress={handleContinue} fullWidth />
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <BottomSheet
         visible={citySheetOpen}

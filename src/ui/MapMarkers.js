@@ -38,7 +38,7 @@ export function PersonMarker({ person, onPress }) {
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View style={[styles.person, { borderColor: colors.background }]}>
-        <Avatar name={person.name} size="sm" />
+        <Avatar name={person.name} uri={person.photoUrl} size="sm" />
       </View>
     </Marker>
   );

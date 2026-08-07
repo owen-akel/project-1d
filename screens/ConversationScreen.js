@@ -108,7 +108,7 @@ export default function ConversationScreen() {
       <View style={[styles.messageRow, mine ? styles.mineRow : styles.theirsRow]}>
         {!mine && conversation.type === 'group' ? (
           <View style={styles.messageAvatar}>
-            {showSender ? <Avatar name={sender?.name} size="xs" tone="muted" /> : null}
+            {showSender ? <Avatar name={sender?.name} uri={sender?.photoUrl} size="xs" tone="muted" /> : null}
           </View>
         ) : null}
 
@@ -166,7 +166,7 @@ export default function ConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Open ${participants[0].name}'s profile`}
             >
-              <Avatar name={participants[0].name} size="sm" tone="muted" />
+              <Avatar name={participants[0].name} uri={participants[0].photoUrl} size="sm" tone="muted" />
             </TouchableOpacity>
           ) : null
         }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -38,6 +38,11 @@ export default function Avatar({
   const { colors, typography } = useTheme();
   const dimension = SIZES[size] || SIZES.md;
 
+  // Photos are remote, so a failed load falls back to initials rather than
+  // leaving a blank circle.
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const showPhoto = Boolean(uri) && !photoFailed;
+
   const background = tone === 'muted' ? colors.primaryMuted : colors.primary;
   const foreground = tone === 'muted' ? colors.primary : colors.onPrimary;
 
@@ -62,10 +67,11 @@ export default function Avatar({
           ring && { borderWidth: 2, borderColor: colors.background },
         ]}
       >
-        {uri ? (
+        {showPhoto ? (
           <Image
             source={{ uri }}
             style={{ width: dimension, height: dimension, borderRadius: dimension / 2 }}
+            onError={() => setPhotoFailed(true)}
           />
         ) : (
           <Text

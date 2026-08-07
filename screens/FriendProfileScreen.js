@@ -123,7 +123,7 @@ export default function FriendProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Card style={styles.identityCard}>
-          <Avatar name={person.name} size="xl" connectors={connectors} />
+          <Avatar name={person.name} uri={person.photoUrl} size="xl" connectors={connectors} />
           <Text style={[typography.title, { color: colors.textPrimary, marginTop: spacing.md }]}>
             {person.name}
           </Text>
@@ -199,6 +199,7 @@ export default function FriendProfileScreen() {
                 ) : null}
                 <PersonRow
                   name={friend.name}
+                  avatarUri={friend.photoUrl}
                   subtitle={friend.city}
                   connectors={friend.connectors}
                   onPress={() => navigation.push('FriendProfile', { userId: friend.id })}

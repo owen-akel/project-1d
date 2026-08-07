@@ -53,6 +53,7 @@ export default function CityUsersScreen() {
                 ) : null}
                 <PersonRow
                   name={user.name}
+                  avatarUri={user.photoUrl}
                   subtitle={(user.interests || []).slice(0, 3).join(' · ')}
                   meta={user.isDirectFriend ? 'Friend' : undefined}
                   connectors={user.connectors}
