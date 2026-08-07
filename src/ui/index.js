@@ -14,3 +14,4 @@ export { default as ConnectionWeb } from './ConnectionWeb';
 export { default as EventBackdrop } from './EventBackdrop';
 export { default as ReplyContext } from './ReplyContext';
 export { default as EventDetailsSheet } from './EventDetailsSheet';
+export { default as CategoryIcon } from './categoryIcons';

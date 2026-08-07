@@ -27,6 +27,7 @@ import {
   PersonRow,
   BottomSheet,
   EventBackdrop,
+  CategoryIcon,
   getInitials,
 } from '../src/ui';
 
@@ -292,31 +293,6 @@ export default function ConnectionsEventsScreen() {
       });
   };
 
-  const getEventIcon = (type) => {
-    switch (type) {
-      case 'golf':
-        return '⛳';
-      case 'lifting':
-        return '💪';
-      case 'running':
-        return '🏃';
-      case 'beer':
-        return '🍺';
-      case 'movies':
-        return '🎬';
-      case 'academic':
-        return '📚';
-      case 'outdoor':
-        return '⛰️';
-      case 'social':
-        return '🎮';
-      case 'creative':
-        return '📸';
-      default:
-        return '📅';
-    }
-  };
-
   return (
     <Screen>
       <ScreenHeader
@@ -387,7 +363,7 @@ export default function ConnectionsEventsScreen() {
                           <Text style={styles.eventHostMessage}>💬</Text>
                         </TouchableOpacity>
                       ) : null}
-                      <Text style={styles.eventTypeIcon}>{getEventIcon(event.type)}</Text>
+                      <CategoryIcon type={event.type} color={colors.textTertiary} size={18} />
                     </View>
                     <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                       {event.title}

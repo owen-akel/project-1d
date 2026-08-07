@@ -34,6 +34,7 @@ import {
   PersonRow,
   BottomSheet,
   EventBackdrop,
+  CategoryIcon,
   getInitials,
 } from '../src/ui';
 
@@ -743,43 +744,6 @@ export default function LocalEventsScreen() {
       });
   };
 
-  const getEventIcon = (type) => {
-    switch (type) {
-      case 'concerts':
-        return '🎵';
-      case 'comedy':
-        return '😂';
-      case 'festivals':
-        return '🎪';
-      case 'sports':
-        return '⚽';
-      case 'theater':
-        return '🎭';
-      case 'music-festival':
-        return '🎶';
-      case 'golf':
-        return '⛳';
-      case 'lifting':
-        return '💪';
-      case 'running':
-        return '🏃';
-      case 'beer':
-        return '🍺';
-      case 'movies':
-        return '🎬';
-      case 'music':
-        return '🎵';
-      case 'art':
-        return '🎨';
-      case 'food':
-        return '🍔';
-      case 'fitness':
-        return '🧘';
-      default:
-        return '📅';
-    }
-  };
-
   return (
     <Screen>
       <ScreenHeader title="Local" subtitle={`Events in ${user?.residence || 'your city'}`}>
@@ -822,7 +786,7 @@ export default function LocalEventsScreen() {
                 <EventBackdrop event={event} height={190} width={340} />
                 <View style={styles.eventCardTop}>
                   <View style={[styles.eventIconContainer, { backgroundColor: colors.primaryMuted }]}>
-                    <Text style={styles.eventIcon}>{getEventIcon(event.type)}</Text>
+                    <CategoryIcon type={event.type} color={colors.primary} size={24} />
                   </View>
                   <View style={styles.eventContent}>
                     <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>

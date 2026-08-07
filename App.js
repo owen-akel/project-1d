@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   NavigationContainer,
@@ -31,7 +31,7 @@ import FriendProfileScreen from './screens/FriendProfileScreen';
 import FriendRequestsScreen from './screens/FriendRequestsScreen';
 import InviteContactsScreen from './screens/InviteContactsScreen';
 import CityUsersScreen from './screens/CityUsersScreen';
-import { LocalIcon, ConnectionsIcon, ChatIcon, ProfileIcon, BrandMark } from './src/ui/icons';
+import { LocalIcon, ConnectionsIcon, ChatIcon, ProfileIcon } from './src/ui/icons';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -185,7 +185,11 @@ function TabNavigator() {
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused }) => (
             <View style={styles.iconContainer}>
-              <BrandMark color={focused ? colors.primary : colors.textTertiary} size={30} />
+              <Image
+                source={require('./assets/logo_light.png')}
+                style={[styles.homeLogo, { opacity: focused ? 1 : 0.5 }]}
+                resizeMode="contain"
+              />
             </View>
           ),
         }}
@@ -296,5 +300,9 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  homeLogo: {
+    width: 30,
+    height: 30,
   },
 });

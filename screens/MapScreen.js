@@ -18,7 +18,16 @@ import { useFriends } from '../context/FriendsContext';
 import { canViewUser, toMockCityName } from '../src/social/visibility';
 import { MAJOR_US_CITIES, findClosestCity } from '../src/data/cities';
 import useCityEvents from '../src/hooks/useCityEvents';
-import { Chip, EventDetailsSheet } from '../src/ui';
+import { eventCoordinate, personCoordinate } from '../src/social/placement';
+import {
+  Avatar,
+  Button,
+  BottomSheet,
+  Chip,
+  EventDetailsSheet,
+  SegmentedControl,
+  CategoryIcon,
+} from '../src/ui';
 
 const { width, height } = Dimensions.get('window');
 
@@ -43,6 +52,19 @@ function buildDayOptions(days) {
     return { value: toYmd(date), label };
   });
 }
+/** Label for a chosen day, matching the wording in the picker. */
+function dayLabel(value) {
+  const today = toYmd(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (value === today) return 'Today';
+  if (value === toYmd(tomorrow)) return 'Tomorrow';
+
+  const parsed = new Date(`${value}T00:00:00`);
+  return parsed.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 const DEFAULT_REGION = {
   latitude: 40.7128,
   longitude: -74.0060,
@@ -67,6 +89,12 @@ export default function MapScreen() {
   // Events for one day at a time, so the map stays readable.
   const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
   const [openEventId, setOpenEventId] = useState(null);
+  const [dateSheetOpen, setDateSheetOpen] = useState(false);
+
+  // What the map is showing: people, events, or both.
+  const [viewMode, setViewMode] = useState('both');
+  const showEvents = viewMode === 'events' || viewMode === 'both';
+  const showPeople = viewMode === 'people' || viewMode === 'both';
 
   const dayOptions = useMemo(() => buildDayOptions(7), []);
 
@@ -77,28 +105,31 @@ export default function MapScreen() {
     friends,
   });
 
-  // Not every venue comes back with coordinates, so anything missing gets
-  // scattered near the city centre rather than dropped from the map.
-  const mappedEvents = useMemo(() => {
-    if (!currentCityCoords) return [];
+  // Ticketmaster gives real venue coordinates; anything without them gets a
+  // stable invented spot near the city centre.
+  const mappedEvents = useMemo(
+    () =>
+      dayEvents
+        .map((event) => {
+          const { coordinate, precise } = eventCoordinate(event, currentCity);
+          return coordinate ? { ...event, coordinate, precise } : null;
+        })
+        .filter(Boolean),
+    [dayEvents, currentCity]
+  );
 
-    return dayEvents.map((event, index) => {
-      const hasCoords = Number.isFinite(event.latitude) && Number.isFinite(event.longitude);
-      if (hasCoords) {
-        return { ...event, coordinate: { latitude: event.latitude, longitude: event.longitude } };
-      }
+  // People you can see in this city, placed around it like a Snap Map.
+  const mappedPeople = useMemo(() => {
+    if (!currentCity || currentCity === 'Loading...') return [];
 
-      const angle = (index / Math.max(dayEvents.length, 1)) * Math.PI * 2;
-      return {
-        ...event,
-        approximate: true,
-        coordinate: {
-          latitude: currentCityCoords.latitude + Math.cos(angle) * 0.045,
-          longitude: currentCityCoords.longitude + Math.sin(angle) * 0.055,
-        },
-      };
-    });
-  }, [dayEvents, currentCityCoords]);
+    return getUsersByCity(toMockCityName(currentCity))
+      .filter((cityUser) => canViewUser(cityUser.id, friends))
+      .map((cityUser) => {
+        const coordinate = personCoordinate(cityUser);
+        return coordinate ? { ...cityUser, coordinate } : null;
+      })
+      .filter(Boolean);
+  }, [currentCity, friends]);
 
   const openEvent = useMemo(
     () => mappedEvents.find((event) => event.id === openEventId) || null,
@@ -310,38 +341,70 @@ export default function MapScreen() {
             />
           )}
 
-          {mappedEvents.map((event) => (
-            <Marker
-              key={event.id}
-              coordinate={event.coordinate}
-              onPress={() => setOpenEventId(event.id)}
-              tracksViewChanges={false}
-            >
-              <View style={[styles.eventPin, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-                <Text style={[styles.eventPinText, { color: colors.onPrimary }]}>
-                  {(event.attendeeIds || []).length || '•'}
-                </Text>
-              </View>
-            </Marker>
-          ))}
+          {showPeople &&
+            mappedPeople.map((person) => (
+              <Marker
+                key={`person-${person.id}`}
+                coordinate={person.coordinate}
+                onPress={() => navigation.navigate('FriendProfile', { userId: person.id })}
+                tracksViewChanges={false}
+              >
+                <View style={[styles.personMarker, { borderColor: colors.background }]}>
+                  <Avatar name={person.name} size="sm" />
+                </View>
+              </Marker>
+            ))}
+
+          {showEvents &&
+            mappedEvents.map((event) => (
+              <Marker
+                key={`event-${event.id}`}
+                coordinate={event.coordinate}
+                onPress={() => setOpenEventId(event.id)}
+                tracksViewChanges={false}
+              >
+                <View style={styles.eventMarker}>
+                  <View
+                    style={[
+                      styles.eventMarkerBody,
+                      { backgroundColor: colors.card, borderColor: colors.primary },
+                    ]}
+                  >
+                    <CategoryIcon type={event.type} color={colors.primary} size={18} />
+                    {(event.attendeeIds || []).length > 0 ? (
+                      <View style={[styles.eventMarkerCount, { backgroundColor: colors.primary }]}>
+                        <Text style={[styles.eventMarkerCountText, { color: colors.onPrimary }]}>
+                          {event.attendeeIds.length}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={[styles.eventMarkerStem, { backgroundColor: colors.primary }]} />
+                </View>
+              </Marker>
+            ))}
         </MapView>
 
-        {/* Day filter */}
-        <View style={styles.dayFilter} pointerEvents="box-none">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayFilterContent}
-          >
-            {dayOptions.map((option) => (
-              <Chip
-                key={option.value}
-                label={option.label}
-                selected={selectedDay === option.value}
-                onPress={() => setSelectedDay(option.value)}
-              />
-            ))}
-          </ScrollView>
+        {/* Controls */}
+        <View style={styles.controls} pointerEvents="box-none">
+          <Button
+            label={`${dayLabel(selectedDay)}  ▾`}
+            variant="secondary"
+            size="sm"
+            onPress={() => setDateSheetOpen(true)}
+            style={[styles.dateButton, { backgroundColor: colors.card }]}
+          />
+
+          <SegmentedControl
+            style={[styles.viewToggle, { backgroundColor: colors.card }]}
+            value={viewMode}
+            onChange={setViewMode}
+            segments={[
+              { key: 'people', label: 'People' },
+              { key: 'events', label: 'Events' },
+              { key: 'both', label: 'Both' },
+            ]}
+          />
         </View>
 
         {/* Zoom Controls */}
@@ -386,11 +449,54 @@ export default function MapScreen() {
           >
             <Text style={[styles.floatingCityName, { color: colors.textPrimary }]}>{currentCity}</Text>
             <Text style={[styles.floatingCityConnections, { color: colors.primary }]}>
-              {currentCityUsersCount} connections · {mappedEvents.length} events
+              {showPeople ? `${mappedPeople.length} connections` : ''}
+              {showPeople && showEvents ? ' · ' : ''}
+              {showEvents ? `${mappedEvents.length} events` : ''}
             </Text>
           </TouchableOpacity>
         )}
       </View>
+
+      <BottomSheet
+        visible={dateSheetOpen}
+        onClose={() => setDateSheetOpen(false)}
+        title="Pick a day"
+        subtitle="Events happening on this date show on the map"
+      >
+        <ScrollView style={styles.dateSheet} contentContainerStyle={styles.dateSheetContent}>
+          {dayOptions.map((option) => {
+            const selected = option.value === selectedDay;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => {
+                  setSelectedDay(option.value);
+                  setDateSheetOpen(false);
+                }}
+                style={[
+                  styles.dateRow,
+                  { backgroundColor: selected ? colors.primaryMuted : 'transparent' },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dateRowText,
+                    {
+                      color: selected ? colors.primary : colors.textPrimary,
+                      fontWeight: selected ? '700' : '500',
+                    },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {selected ? (
+                  <Text style={[styles.dateRowText, { color: colors.primary }]}>✓</Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </BottomSheet>
 
       <EventDetailsSheet
         visible={Boolean(openEvent)}
@@ -405,19 +511,6 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  eventPin: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventPinText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
   dayFilter: {
     position: 'absolute',
     top: 12,
