@@ -363,7 +363,7 @@ export default function ConnectionsEventsScreen() {
                           <Text style={styles.eventHostMessage}>💬</Text>
                         </TouchableOpacity>
                       ) : null}
-                      <CategoryIcon type={event.type} color={colors.textTertiary} size={18} />
+                      <CategoryIcon event={event} color={colors.textTertiary} size={18} />
                     </View>
                     <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                       {event.title}

@@ -59,7 +59,7 @@ export function EventMarker({ event, onPress }) {
     >
       <View style={styles.event}>
         <View style={[styles.eventBody, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-          <CategoryIcon type={event.type} color={colors.primary} size={18} />
+          <CategoryIcon event={event} color={colors.primary} size={18} />
         </View>
         {goingCount > 0 ? (
           <View style={[styles.eventCount, { backgroundColor: colors.primary }]}>

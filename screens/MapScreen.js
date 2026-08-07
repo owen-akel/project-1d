@@ -19,12 +19,7 @@ import { canViewUser, toMockCityName } from '../src/social/visibility';
 import { MAJOR_US_CITIES, findClosestCity } from '../src/data/cities';
 import useCityEvents from '../src/hooks/useCityEvents';
 import { eventCoordinate, personCoordinate } from '../src/social/placement';
-import {
-  Button,
-  BottomSheet,
-  EventDetailsSheet,
-  SegmentedControl,
-} from '../src/ui';
+import { Button, BottomSheet, Chip, EventDetailsSheet } from '../src/ui';
 import { PersonMarker, EventMarker } from '../src/ui/MapMarkers';
 
 const { width, height } = Dimensions.get('window');
@@ -89,10 +84,20 @@ export default function MapScreen() {
   const [openEventId, setOpenEventId] = useState(null);
   const [dateSheetOpen, setDateSheetOpen] = useState(false);
 
-  // What the map is showing: people, events, or both.
-  const [viewMode, setViewMode] = useState('both');
-  const showEvents = viewMode === 'events' || viewMode === 'both';
-  const showPeople = viewMode === 'people' || viewMode === 'both';
+  // Two independent toggles. Either, or both — but never neither, since an
+  // empty map tells you nothing.
+  const [showPeople, setShowPeople] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
+
+  const toggleLayer = (layer) => {
+    if (layer === 'people') {
+      if (showPeople && !showEvents) return; // keep at least one on
+      setShowPeople((previous) => !previous);
+    } else {
+      if (showEvents && !showPeople) return;
+      setShowEvents((previous) => !previous);
+    }
+  };
 
   const dayOptions = useMemo(() => buildDayOptions(7), []);
 
@@ -368,16 +373,18 @@ export default function MapScreen() {
             style={[styles.dateButton, { backgroundColor: colors.card }]}
           />
 
-          <SegmentedControl
-            style={[styles.viewToggle, { backgroundColor: colors.card }]}
-            value={viewMode}
-            onChange={setViewMode}
-            segments={[
-              { key: 'people', label: 'People' },
-              { key: 'events', label: 'Events' },
-              { key: 'both', label: 'Both' },
-            ]}
-          />
+          <View style={styles.layerToggles}>
+            <Chip
+              label={`People · ${mappedPeople.length}`}
+              selected={showPeople}
+              onPress={() => toggleLayer('people')}
+            />
+            <Chip
+              label={`Events · ${mappedEvents.length}`}
+              selected={showEvents}
+              onPress={() => toggleLayer('events')}
+            />
+          </View>
         </View>
 
         {/* Zoom Controls */}
@@ -495,8 +502,9 @@ const styles = StyleSheet.create({
   dateButton: {
     alignSelf: 'flex-start',
   },
-  viewToggle: {
-    alignSelf: 'stretch',
+  layerToggles: {
+    flexDirection: 'row',
+    gap: 8,
   },
   dateSheet: {
     flexGrow: 0,

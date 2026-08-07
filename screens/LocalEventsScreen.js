@@ -786,7 +786,7 @@ export default function LocalEventsScreen() {
                 <EventBackdrop event={event} height={190} width={340} />
                 <View style={styles.eventCardTop}>
                   <View style={[styles.eventIconContainer, { backgroundColor: colors.primaryMuted }]}>
-                    <CategoryIcon type={event.type} color={colors.primary} size={24} />
+                    <CategoryIcon event={event} color={colors.primary} size={24} />
                   </View>
                   <View style={styles.eventContent}>
                     <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
