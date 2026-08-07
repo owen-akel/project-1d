@@ -4,22 +4,88 @@ A React Native social media application built with Expo that connects people one
 
 ## Features
 
-- **Map Screen**: Interactive map with scrollable view showing nearby users and posts
-  - Uses `react-native-maps` for map functionality
-  - Location-based user posts
-  - User location tracking
-  - Scrollable post cards overlay
+- **Local**: Live events for your city, pulled from Ticketmaster via `events-api`
+  - Date-range picker plus genre / time / attendance / location filters
+  - Repeat showings grouped into a single event with multiple occurrences
 
-- **Chat Screen**: Messaging interface to connect with other users
-  - Conversation list
-  - Message threads
-  - Unread message indicators
+- **Connections**: Events posted by friends and friends-of-friends in your city
 
-- **Profile Screen**: User profile management
-  - Profile information
-  - Stats (posts, followers, following)
-  - Settings and preferences
-  - Dark mode toggle
+- **Home (Map)**: Interactive map showing how many of your connections are in each city
+
+- **Chat**: Direct messages and group chats
+  - Group creation searches across friends *and* friends-of-friends
+  - A message shortcut sits next to every name in the app (profiles, the city
+    list, event attendee lists, friend lists, requests)
+
+- **Profile**: Two tabs
+  - *Profile* — photo, residence, hometown/college/grad year, interests
+  - *Friends* — the connection web: total friends, friends-of-friends, and total
+    reach, drawn as a radial graph, plus the friend list and pending requests.
+    Pick a city to highlight everyone who lives there — direct and indirect —
+    with a pill showing the total that opens the full list, filterable by
+    degree and interest. Tap a friend to zoom in: they become the centre, you
+    slide to the edge along the angle they already occupied, and their own
+    connections fan out around them.
+
+- **Connector bubbles**: a friend-of-a-friend's avatar carries small bubbles for
+  the direct friends you're linked through, with a matching "via …" line.
+
+- **Friend requests**: Send, cancel, accept, and decline requests. A Discover tab
+  surfaces people you're not connected to yet, ranked by shared mutuals.
+
+- **Invite contacts**: After sign-in (and any time from Profile), pick contacts
+  and send them an invite. Contacts are read on-device only, and the invite opens
+  your own Messages app — nothing sends automatically.
+
+## Running locally
+
+Start to finish on a fresh clone. There are **two** npm projects here — the Expo
+app at the root and the events API in `events-api/` — so both need installing.
+
+```bash
+# 1. App dependencies
+npm install
+
+# 2. Backend dependencies
+cd events-api && npm install && cd ..
+
+# 3. Backend config — copy the template and add your own Ticketmaster key
+cp events-api/.env.example events-api/.env
+# then edit events-api/.env and set TICKETMASTER_API_KEY
+
+# 4. Run the API and the app together
+npm run dev
+```
+
+Then press `i` in the Expo output to open the iOS simulator (or scan the QR code
+with Expo Go).
+
+### Getting a Ticketmaster key
+
+Register at
+[developer.ticketmaster.com](https://developer-acct.ticketmaster.com/user/register)
+and use the **Consumer Key** from your app. It's free, and the default quota is
+plenty for development.
+
+The key is per-developer and must never be committed — `events-api/.env` is
+gitignored and should stay that way.
+
+### Running without a key
+
+The app still runs: `events-api` refuses to start without the key, the Local tab's
+fetch fails, and it falls back to the mock events in `src/mock/events.js` with a
+"Live events unavailable" note. Everything else — the connection web, friend
+requests, chat, invites — works normally, since it's all local mock data.
+
+### Notes
+
+- The app reaches the API at `http://localhost:4000`, which works on the
+  simulator and web but **not** on a physical phone over Expo Go. Point
+  `EVENTS_API_BASE_URL` in `screens/LocalEventsScreen.js` at your machine's LAN
+  IP to test on a real device.
+- No state persists. Profile edits, friends, requests, and messages all live in
+  React context, so a reload resets everything to the seeded state — which means
+  a fresh clone looks the same as any other.
 
 ## Getting Started
 
@@ -59,17 +125,45 @@ npm start
 
 ```
 project-1d/
-├── App.js                 # Main app entry point with navigation
-├── app.json              # Expo configuration
-├── package.json          # Dependencies
+├── App.js                     # Navigation: 5 tabs + nested stacks
+├── app.json                   # Expo configuration
 ├── context/
-│   └── ThemeContext.js   # Theme provider (light/dark mode)
+│   ├── ThemeContext.js        # Colors + spacing/radius/typography/shadow tokens
+│   ├── UserContext.js         # Current user profile
+│   └── FriendsContext.js      # Friends list + incoming/outgoing friend requests
 ├── screens/
-│   ├── MapScreen.js      # Map view with user posts
-│   ├── ChatScreen.js     # Messaging interface
-│   └── ProfileScreen.js  # User profile page
-└── README.md
+│   ├── LocalEventsScreen.js   # Live events + filters
+│   ├── ConnectionsEventsScreen.js
+│   ├── MapScreen.js
+│   ├── ChatScreen.js / NewChatScreen.js
+│   ├── ProfileScreen.js       # Profile | Friends tabs
+│   ├── FriendProfileScreen.js
+│   ├── FriendRequestsScreen.js
+│   ├── InviteContactsScreen.js
+│   ├── CityUsersScreen.js / CreateEventScreen.js
+│   └── AuthScreen.js / LaunchScreen.js
+├── src/
+│   ├── ui/                    # Shared primitives (Screen, Card, Button, Chip,
+│   │                          # Avatar, BottomSheet, ConnectionWeb, …)
+│   ├── social/
+│   │   ├── visibility.js      # Single source of truth for "can I see this user?"
+│   │   └── connections.js     # Friends / friends-of-friends / reach math
+│   ├── data/                  # Shared city + interest reference data
+│   └── mock/                  # Mock users, friend graph, events
+├── events-api/                # Express service proxying Ticketmaster
+└── prec/                      # Unused screens from an earlier project
 ```
+
+### Conventions
+
+- Style with tokens from `useTheme()` (`colors`, `spacing`, `radius`,
+  `typography`, `shadows`) rather than hardcoded values, and build screens out
+  of `src/ui` primitives so they stay visually consistent. The app defaults to
+  the dark palette; both themes must stay legible (there's a toggle on Profile).
+- Text on a primary-coloured surface uses `colors.onPrimary`, not `#ffffff` —
+  the accent is light in dark mode, so white-on-teal is unreadable there.
+- Anything that decides whether one user can see another goes through
+  `src/social/visibility.js`. Don't reimplement it per screen.
 
 ## Map API Setup
 

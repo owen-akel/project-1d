@@ -19,7 +19,8 @@
       "bundleIdentifier": "com.onedegree.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "1D needs access to your location to show you on the map and connect you with nearby users.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "1D needs access to your location to show you on the map and connect you with nearby users."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "1D needs access to your location to show you on the map and connect you with nearby users.",
+        "NSContactsUsageDescription": "1D uses your contacts so you can choose which friends to invite. Your contacts stay on your device."
       }
     },
     "android": {
@@ -30,7 +31,8 @@
       "package": "com.onedegree.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "READ_CONTACTS"
       ]
     },
     "web": {
@@ -41,6 +43,12 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow 1D to use your location."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow 1D to access your contacts so you can pick who to invite."
         }
       ]
     ]

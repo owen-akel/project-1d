@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   TextInput,
   Alert,
 } from 'react-native';
@@ -15,33 +14,22 @@ import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
 import { getConnectionEventsByCity } from '../src/mock/events';
 import { USERS_BY_ID, getUsersByCity } from '../src/mock/users';
-
-// Helper to check if a user can be viewed
-function canViewUser(targetUserId, currentUserFriends) {
-  // Main users are only visible if they're in the friends list
-  if (targetUserId.startsWith('main-user-')) {
-    return currentUserFriends.includes(targetUserId);
-  }
-  
-  // Extract parent main user from friend ID (e.g., "rod-friend-5" -> "rod")
-  const parts = targetUserId.split('-');
-  if (parts.length >= 2 && parts[1] === 'friend') {
-    const firstName = parts[0];
-    const mainUserIndex = [
-      'rod', 'sam', 'clay', 'harry', 'john', 'pete',
-      'liam', 'warren', 'jackson', 'eric', 'simon', 'greg'
-    ].indexOf(firstName);
-    
-    if (mainUserIndex !== -1) {
-      const parentMainUserId = `main-user-${mainUserIndex + 1}`;
-      // Only visible if parent main user is in friends list
-      return currentUserFriends.includes(parentMainUserId);
-    }
-  }
-  
-  // Default: not visible
-  return false;
-}
+import { canViewUser, toMockCityName, CURRENT_USER_ID } from '../src/social/visibility';
+import { getConnectorFriends } from '../src/social/connections';
+import useOpenChat from '../src/hooks/useOpenChat';
+import {
+  Screen,
+  ScreenHeader,
+  Card,
+  Button,
+  Avatar,
+  EmptyState,
+  PersonRow,
+  BottomSheet,
+  EventBackdrop,
+  CategoryIcon,
+  getInitials,
+} from '../src/ui';
 
 export default function ConnectionsEventsScreen() {
   const { colors } = useTheme();
@@ -49,30 +37,17 @@ export default function ConnectionsEventsScreen() {
   const route = useRoute();
   const { user } = useUser();
   const { friends } = useFriends();
-
-  // Current user ID
-  const CURRENT_USER_ID = 'current-user-1';
+  const { openDirectMessage } = useOpenChat();
 
   // Store user-created events
   const [userCreatedEvents, setUserCreatedEvents] = useState([]);
-
-  // Map city names from UserContext to mock data city codes
-  const mapCityNameToMockCity = (cityName) => {
-    const cityMap = {
-      'New York': 'NYC',
-      'Los Angeles': 'LA',
-      'San Francisco': 'SF',
-    };
-    return cityMap[cityName] || cityName;
-  };
 
   // Filter events by residence and friend visibility
   const filteredEvents = useMemo(() => {
     if (!user?.residence) {
       return [];
     }
-    const mockCityName = mapCityNameToMockCity(user.residence);
-    const cityEvents = getConnectionEventsByCity(mockCityName, friends);
+    const cityEvents = getConnectionEventsByCity(toMockCityName(user.residence), friends);
     
     // Filter to only show events from visible hosts (friends + their friends)
     return cityEvents.filter(event => canViewUser(event.hostId, friends));
@@ -298,683 +273,389 @@ export default function ConnectionsEventsScreen() {
   // filter by city and ensure they're still visible (in case friends list changed)
   const getVisibleAttendees = (event) => {
     if (!event || !user?.residence || !event.attendeeIds || event.attendeeIds.length === 0) return [];
-    const mockCityName = mapCityNameToMockCity(user.residence);
-    const cityUsers = getUsersByCity(mockCityName);
-    const cityUserIds = new Set(cityUsers.map(u => u.id));
-    
+    const cityUserIds = new Set(
+      getUsersByCity(toMockCityName(user.residence)).map((cityUser) => cityUser.id)
+    );
+
     return event.attendeeIds
-      .filter(attendeeId => cityUserIds.has(attendeeId)) // Must live in the city
-      .filter(attendeeId => canViewUser(attendeeId, friends)) // Must be visible
-      .map(attendeeId => {
-        const user = USERS_BY_ID.get(attendeeId);
+      .filter((attendeeId) => cityUserIds.has(attendeeId)) // Must live in the city
+      .filter((attendeeId) => canViewUser(attendeeId, friends)) // Must be visible
+      .map((attendeeId) => {
+        const attendee = USERS_BY_ID.get(attendeeId);
+        const name = attendee?.name || 'Unknown';
         return {
           id: attendeeId,
-          name: user?.name || 'Unknown',
-          avatar: user?.name ? user.name.split(' ').map(n => n[0]).join('') : '👤',
+          name,
+          avatar: getInitials(name),
+          photoUrl: attendee?.photoUrl || null,
+          city: attendee?.city,
+          connectors: getConnectorFriends(attendeeId, friends),
         };
       });
   };
 
-  const getEventIcon = (type) => {
-    switch (type) {
-      case 'golf':
-        return '⛳';
-      case 'lifting':
-        return '💪';
-      case 'running':
-        return '🏃';
-      case 'beer':
-        return '🍺';
-      case 'movies':
-        return '🎬';
-      case 'academic':
-        return '📚';
-      case 'outdoor':
-        return '⛰️';
-      case 'social':
-        return '🎮';
-      case 'creative':
-        return '📸';
-      default:
-        return '📅';
-    }
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Connections Events</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            Events in {user?.residence || 'your city'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.newEventButton}
-          onPress={() => navigation.navigate('CreateEvent')}
-        >
-          <Text style={[styles.newEventButtonText, { color: colors.primary }]}>+</Text>
-        </TouchableOpacity>
-      </View>
+    <Screen>
+      <ScreenHeader
+        title="Connections"
+        subtitle={`What friends are doing in ${user?.residence || 'your city'}`}
+        right={
+          <Button
+            label="+ New"
+            variant="secondary"
+            size="sm"
+            onPress={() => navigation.navigate('CreateEvent')}
+          />
+        }
+      />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {events.length > 0 ? (
           events.map((event) => {
             const isInterested = interestedEvents.has(event.id);
             // Check if the host is the current user
-            let hostName, hostInitials;
+            let hostName, hostPhoto;
             if (event.hostId === CURRENT_USER_ID) {
               hostName = user?.name || 'You';
-              hostInitials = user?.name ? user.name.split(' ').map(n => n[0]).join('') : '👤';
+              hostPhoto = user?.photo || null;
             } else {
               const host = USERS_BY_ID.get(event.hostId);
               hostName = host?.name || 'Unknown';
-              hostInitials = host?.name ? host.name.split(' ').map(n => n[0]).join('') : '👤';
+              hostPhoto = host?.photoUrl || null;
             }
             const visibleAttendees = getVisibleAttendees(event);
             
             const isUserEvent = event.hostId === CURRENT_USER_ID;
             
             return (
-              <View
+              <Card
                 key={event.id}
                 style={[
                   styles.eventCard,
-                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                  isUserEvent && styles.userEventCard,
+                  isUserEvent && { borderColor: colors.primary, borderWidth: 1 },
                 ]}
               >
+                <EventBackdrop event={event} height={180} width={340} />
                 <View style={styles.eventCardContent}>
-                  <View style={[styles.hostAvatarContainer, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.hostAvatar}>{hostInitials}</Text>
-                  </View>
+                  <Avatar name={hostName} uri={hostPhoto} size="md" />
                   <View style={styles.eventContent}>
                     <View style={styles.eventHeader}>
-                      <Text style={[styles.eventHost, { color: colors.textPrimary }]}>{hostName}</Text>
-                      <Text style={styles.eventTypeIcon}>{getEventIcon(event.type)}</Text>
+                      <Text style={[styles.eventHost, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {isUserEvent ? 'You' : hostName}
+                      </Text>
+                      {!isUserEvent ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            openDirectMessage(event.hostId, {
+                              kind: 'event',
+                              label: 'posting',
+                              eventTitle: event.title,
+                              imageUrl: event.imageUrl || null,
+                            })
+                          }
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Message ${hostName} about ${event.title}`}
+                        >
+                          <Text style={styles.eventHostMessage}>💬</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      <CategoryIcon event={event} color={colors.textTertiary} size={18} />
                     </View>
-                    <Text style={[styles.eventTitle, { color: colors.textPrimary }]}>{event.title}</Text>
-                    <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>📍 {event.location}</Text>
-                    <View style={styles.eventDetails}>
-                      <Text style={[styles.eventDate, { color: colors.textSecondary }]}>🕐 {event.date}</Text>
-                      <TouchableOpacity onPress={() => openAttendeesModal(event.id)}>
-                        <Text style={[styles.eventAttendees, { color: colors.textSecondary }]}>👥 {visibleAttendees.length} going</Text>
+                    <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                      {event.title}
+                    </Text>
+                    <Text style={[styles.eventMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {event.location}
+                    </Text>
+                    <View style={styles.eventTagRow}>
+                      <Text style={[styles.eventTag, { color: colors.textTertiary }]}>{event.date}</Text>
+                      <TouchableOpacity
+                        onPress={() => openAttendeesModal(event.id)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Text style={[styles.eventTag, { color: colors.primary }]}>
+                          {visibleAttendees.length} going
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 </View>
+
                 {isUserEvent ? (
                   <View style={styles.userEventActions}>
-                    <TouchableOpacity
-                      style={[styles.editButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                    <Button
+                      label="Edit"
+                      variant="secondary"
+                      size="sm"
+                      style={styles.eventActionButton}
                       onPress={() => openEditModal(event)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.editButtonText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.removeButton, { backgroundColor: 'transparent', borderColor: '#ef4444' }]}
+                    />
+                    <Button
+                      label="Remove"
+                      variant="danger"
+                      size="sm"
+                      style={styles.eventActionButton}
                       onPress={() => handleDeleteEvent(event.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.removeButtonText, { color: '#ef4444' }]}>Remove</Text>
-                    </TouchableOpacity>
+                    />
                   </View>
                 ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.interestedButton,
-                      isInterested && { backgroundColor: '#10b981' },
-                      !isInterested && { backgroundColor: colors.cardBorder },
-                    ]}
+                  <Button
+                    label={isInterested ? "I'm in ✓" : "I'm interested"}
+                    variant={isInterested ? 'primary' : 'secondary'}
+                    fullWidth
+                    style={styles.eventAction}
                     onPress={() => toggleInterest(event.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.interestedButtonText,
-                      { color: isInterested ? '#ffffff' : colors.textSecondary }
-                    ]}>
-                      {isInterested ? '✓ Interested' : 'Interested?'}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 )}
-              </View>
+              </Card>
             );
           })
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-              No events found from your connections in {user?.residence || 'your city'}
-            </Text>
-          </View>
+          <EmptyState
+            icon="🤝"
+            title="Nothing from your connections"
+            message={`No one in your network has posted an event in ${user?.residence || 'your city'} yet. Start one.`}
+            actionLabel="Create an event"
+            onAction={() => navigation.navigate('CreateEvent')}
+          />
         )}
       </ScrollView>
-
-      {/* Attendees Modal */}
-      <Modal
+      <BottomSheet
         visible={modalVisible !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeAttendeesModal}
+        onClose={closeAttendeesModal}
+        title={getCurrentEvent()?.title || 'Event'}
+        subtitle="People going"
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeAttendeesModal}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                {getCurrentEvent()?.title}
-              </Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                People Going
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={closeAttendeesModal}
-              >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView 
-              style={styles.attendeesList} 
-              contentContainerStyle={styles.attendeesListContent}
-              showsVerticalScrollIndicator={true}
-            >
-              {(() => {
-                const currentEvent = getCurrentEvent();
-                const visibleAttendees = currentEvent ? getVisibleAttendees(currentEvent) : [];
-                return visibleAttendees.length > 0 ? (
-                  visibleAttendees.map((attendee) => (
-                    <View key={attendee.id} style={[styles.attendeeItem, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.attendeeAvatar, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.attendeeAvatarText}>{attendee.avatar}</Text>
-                      </View>
-                      <Text style={[styles.attendeeName, { color: colors.textPrimary }]}>
-                        {attendee.name}
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                      No attendees yet
-                    </Text>
-                  </View>
-                );
-              })()}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        <ScrollView
+          style={styles.attendeesList}
+          contentContainerStyle={styles.attendeesListContent}
+          showsVerticalScrollIndicator
+        >
+          {(() => {
+            const currentEvent = getCurrentEvent();
+            const visibleAttendees = currentEvent ? getVisibleAttendees(currentEvent) : [];
 
-      {/* Edit Event Modal */}
-      <Modal
+            if (visibleAttendees.length === 0) {
+              return (
+                <EmptyState
+                  icon="👥"
+                  title="Nobody yet"
+                  message="No one from your network has said they're going."
+                />
+              );
+            }
+
+            return visibleAttendees.map((attendee) => (
+              <PersonRow
+                key={attendee.id}
+                name={attendee.name}
+                avatarUri={attendee.photoUrl}
+                subtitle={attendee.city}
+                connectors={attendee.connectors}
+                onPress={() => {
+                  closeAttendeesModal();
+                  navigation.navigate('FriendProfile', { userId: attendee.id });
+                }}
+                onMessage={() => {
+                  // Close first — otherwise the sheet stays up over the Chat tab.
+                  const event = getCurrentEvent();
+                  const hosted = event && attendee.id === event.hostId;
+                  closeAttendeesModal();
+                  openDirectMessage(attendee.id, {
+                    kind: 'event',
+                    label: hosted ? 'posting' : 'going to',
+                    eventTitle: event?.title,
+                    imageUrl: event?.imageUrl || null,
+                  });
+                }}
+              />
+            ));
+          })()}
+        </ScrollView>
+      </BottomSheet>
+
+      <BottomSheet
         visible={editingEvent !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeEditModal}
+        onClose={closeEditModal}
+        title="Edit event"
+        footer={<Button label="Update event" fullWidth onPress={handleUpdateEvent} />}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeEditModal}
-          />
-          <View style={[styles.editModalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <View style={[styles.editModalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>Edit Event</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={closeEditModal}
-              >
-                <Text style={[styles.modalCloseButtonText, { color: colors.textPrimary }]}>✕</Text>
-              </TouchableOpacity>
+        <ScrollView
+          style={styles.editModalBody}
+          contentContainerStyle={styles.editModalBodyContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+        >
+          {[
+            { label: 'Title', placeholder: 'Event title', value: editTitle, onChange: setEditTitle },
+            {
+              label: 'Time',
+              placeholder: 'e.g. Today, 4:00 PM',
+              value: editTime,
+              onChange: setEditTime,
+            },
+            {
+              label: 'Destination',
+              placeholder: 'Location',
+              value: editDestination,
+              onChange: setEditDestination,
+            },
+          ].map((field) => (
+            <View key={field.label} style={styles.editInputSection}>
+              <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>{field.label}</Text>
+              <TextInput
+                style={[
+                  styles.editInput,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+                placeholder={field.placeholder}
+                placeholderTextColor={colors.textTertiary}
+                value={field.value}
+                onChangeText={field.onChange}
+              />
             </View>
-            <ScrollView 
-              style={styles.editModalBody}
-              contentContainerStyle={styles.editModalBodyContent}
-              showsVerticalScrollIndicator={true}
-            >
-              <View style={styles.editInputSection}>
-                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Title *</Text>
-                <TextInput
-                  style={[
-                    styles.editInput,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="Event title"
-                  placeholderTextColor={colors.textTertiary}
-                  value={editTitle}
-                  onChangeText={setEditTitle}
-                />
-              </View>
+          ))}
 
-              <View style={styles.editInputSection}>
-                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Time *</Text>
-                <TextInput
-                  style={[
-                    styles.editInput,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="e.g., Today, 4:00 PM"
-                  placeholderTextColor={colors.textTertiary}
-                  value={editTime}
-                  onChangeText={setEditTime}
-                />
-              </View>
-
-              <View style={styles.editInputSection}>
-                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Destination *</Text>
-                <TextInput
-                  style={[
-                    styles.editInput,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="Location"
-                  placeholderTextColor={colors.textTertiary}
-                  value={editDestination}
-                  onChangeText={setEditDestination}
-                />
-              </View>
-
-              <View style={styles.editInputSection}>
-                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Description</Text>
-                <TextInput
-                  style={[
-                    styles.editTextArea,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                  placeholder="Add details about your event..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={editDescription}
-                  onChangeText={setEditDescription}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.updateButton, { backgroundColor: colors.primary }]}
-                onPress={handleUpdateEvent}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.updateButtonText}>Update Event</Text>
-              </TouchableOpacity>
-            </ScrollView>
+          <View style={styles.editInputSection}>
+            <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Description</Text>
+            <TextInput
+              style={[
+                styles.editTextArea,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+              placeholder="Add details about your event…"
+              placeholderTextColor={colors.textTertiary}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
           </View>
-        </View>
-      </Modal>
-    </View>
+        </ScrollView>
+      </BottomSheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  newEventButton: {
-    padding: 4,
-  },
-  newEventButtonText: {
-    fontSize: 32,
-    fontWeight: '300',
-    lineHeight: 32,
-    color: '#14b8a6',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
   content: {
     flex: 1,
-    padding: 20,
+  },
+  contentContainer: {
+    padding: 24,
+    paddingBottom: 48,
   },
   eventCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  userEventCard: {
-    borderWidth: 3,
+    marginBottom: 12,
   },
   eventCardContent: {
     flexDirection: 'row',
   },
-  hostAvatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  hostAvatar: {
-    fontSize: 24,
-  },
   eventContent: {
     flex: 1,
+    minWidth: 0,
+    marginLeft: 14,
   },
   eventHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'space-between',
+    marginBottom: 2,
   },
   eventHost: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  eventHostMessage: {
+    fontSize: 13,
+    marginLeft: 8,
   },
   eventTypeIcon: {
-    fontSize: 20,
+    fontSize: 16,
+    marginLeft: 8,
   },
   eventTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 6,
+    letterSpacing: -0.2,
+    marginBottom: 3,
   },
-  eventLocation: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 8,
+  eventMeta: {
+    fontSize: 13,
+    fontWeight: '500',
   },
-  eventDetails: {
+  eventTagRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
+    marginTop: 6,
   },
-  eventDate: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  eventAttendees: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  interestedButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  interestedButtonText: {
-    fontSize: 15,
+  eventTag: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748b',
+  },
+  eventAction: {
+    marginTop: 14,
   },
   userEventActions: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+    gap: 10,
+    marginTop: 14,
   },
-  editButton: {
+  eventActionButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  editButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  removeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  removeButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    maxHeight: '80%',
-    minHeight: '40%',
-    flexDirection: 'column',
-  },
-  modalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    position: 'relative',
-    flexShrink: 0,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  modalCloseButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
   },
   attendeesList: {
-    flex: 1,
-    flexGrow: 1,
+    flexGrow: 0,
   },
   attendeesListContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  emptyState: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#64748b',
-  },
-  attendeeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  attendeeAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#14b8a6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  attendeeAvatarText: {
-    fontSize: 20,
-  },
-  attendeeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  eventHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  eventActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: 8,
-  },
-  actionButton: {
-    padding: 4,
-  },
-  actionButtonText: {
-    fontSize: 18,
-  },
-  editModalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    maxHeight: '85%',
-    minHeight: '50%',
-    flexDirection: 'column',
-  },
-  editModalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    position: 'relative',
-    flexShrink: 0,
-  },
-  editModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 28,
   },
   editModalBody: {
-    flex: 1,
-    flexGrow: 1,
+    flexGrow: 0,
   },
   editModalBodyContent: {
-    padding: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   editInputSection: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   editInputLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 8,
   },
   editInput: {
-    backgroundColor: '#f8fafc',
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   editTextArea: {
-    backgroundColor: '#f8fafc',
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minHeight: 100,
-  },
-  updateButton: {
-    backgroundColor: '#14b8a6',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  updateButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+    minHeight: 96,
   },
 });
-
-

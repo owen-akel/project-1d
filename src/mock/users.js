@@ -1,57 +1,15 @@
 // Mock user database with 156 users: 12 main users + 144 friends
 
-const INTERESTS_BY_CATEGORY = {
-  'Sports & Fitness': [
-    'Running', 'Lifting', 'Soccer', 'Basketball', 'Tennis', 'Pickleball', 'Golf', 
-    'Baseball', 'Softball', 'Volleyball', 'Swimming', 'Cycling', 'Yoga', 'Pilates',
-    'CrossFit', 'Martial Arts', 'Boxing', 'Rock Climbing', 'Hiking', 'Surfing',
-    'Snowboarding', 'Skiing', 'Ice Skating', 'Skateboarding', 'Mountain Biking',
-    'Rowing', 'Cricket', 'Rugby', 'Badminton', 'Table Tennis', 'Archery',
-  ],
-  'Music & Arts': [
-    'Live Music', 'Concerts', 'Playing Guitar', 'Playing Piano', 'DJing', 
-    'Singing', 'Songwriting', 'Photography', 'Art', 'Painting', 'Drawing',
-    'Sculpting', 'Digital Art', 'Pottery', 'Calligraphy', 'Dance', 'Ballet',
-    'Theater', 'Acting', 'Stand-up Comedy', 'Writing', 'Poetry',
-  ],
-  'Social & Entertainment': [
-    'Drinking', 'Wine Tasting', 'Cocktail Making', 'Breweries', 'Nightlife',
-    'Parties', 'Festivals', 'Food & Dining', 'Cooking', 'Baking', 'Foodie',
-    'Travel', 'Adventure Travel', 'Backpacking', 'Camping', 'Beach',
-  ],
-  'Intellectual & Creative': [
-    'Reading', 'Book Clubs', 'Podcasts', 'Learning Languages', 'Chess',
-    'Board Games', 'Video Games', 'Gaming', 'Puzzles', 'Crossword Puzzles',
-    'Trivia', 'Debate', 'Philosophy', 'History', 'Astronomy', 'Science',
-  ],
-  'Outdoor & Nature': [
-    'Gardening', 'Bird Watching', 'Fishing', 'Hunting', 'Boating', 'Sailing',
-    'Kayaking', 'Paddleboarding', 'Snorkeling', 'Scuba Diving', 'Wildlife',
-    'Nature Photography', 'Stargazing', 'Outdoor Adventure',
-  ],
-  'Social Activities': [
-    'Networking', 'Meetups', 'Volunteering', 'Community Service', 'Mentoring',
-    'Ball Games', 'Team Sports', 'Social Sports',
-  ],
-  'Other Hobbies': [
-    'Collecting', 'Antiques', 'Fashion', 'Styling', 'Fitness Modeling',
-    'Meditation', 'Mindfulness', 'Wellness', 'Self-Care', 'Spa',
-    'Shopping', 'Thrifting', 'Flea Markets', 'Markets', 'Crafting',
-    'Sewing', 'Knitting', 'Crocheting', 'Woodworking', 'DIY Projects',
-    'Home Improvement', 'Interior Design', 'Real Estate', 'Investing',
-    'Cryptocurrency', 'Trading', 'Stocks', 'Entrepreneurship', 'Startups',
-    'Tech', 'Programming', 'Coding', 'Design', 'Fashion Design',
-    'Film', 'Movies', 'Cinema', 'Documentaries', 'TV Shows', 'Binge Watching',
-    'Streaming', 'Anime', 'Manga', 'Comics', 'Graphic Novels',
-    'Cars', 'Motorcycles', 'Racing', 'Car Shows', 'Auto Mechanics',
-    'Dogs', 'Cats', 'Pets', 'Animal Rescue', 'Horseback Riding',
-    'Motorcycling', 'ATV', 'Dirt Biking', 'Flying', 'Aviation',
-    'Magic', 'Card Tricks', 'Juggling', 'Circus Arts',
-  ],
-};
+import { ALL_INTERESTS } from '../data/interests';
 
-// Flatten all interests
-const ALL_INTERESTS = Object.values(INTERESTS_BY_CATEGORY).flat();
+/**
+ * Stand-in profile photos.
+ *
+ * pravatar serves a fixed set of portraits keyed by whatever seed you hand it,
+ * so a given user always gets the same face. Avatar falls back to initials if
+ * the request fails, which keeps the app usable offline.
+ */
+const photoFor = (id) => `https://i.pravatar.cc/240?u=${encodeURIComponent(id)}`;
 
 // Fixed list of cities
 const CITIES = ['Boston', 'NYC', 'Chicago', 'LA', 'SF', 'Austin'];
@@ -87,11 +45,13 @@ const MAIN_USER_NAMES = [
 // Generate main users
 const mainUsers = MAIN_USER_NAMES.map((name, index) => {
   const firstName = name.split(' ')[0].toLowerCase();
+  const id = `main-user-${index + 1}`;
   return {
-    id: `main-user-${index + 1}`,
+    id,
     name,
     city: getCityForUserIndex(index),
     interests: getRandomInterests(),
+    photoUrl: photoFor(id),
   };
 });
 
@@ -101,11 +61,13 @@ mainUsers.forEach((mainUser, mainIndex) => {
   const firstName = mainUser.name.split(' ')[0].toLowerCase();
   for (let i = 1; i <= 12; i++) {
     const friendIndex = mainIndex * 12 + i - 1;
+    const id = `${firstName}-friend-${i}`;
     friendUsers.push({
-      id: `${firstName}-friend-${i}`,
+      id,
       name: `${mainUser.name.split(' ')[0]} Friend ${i}`,
       city: getCityForUserIndex(friendIndex + 12), // Offset to distribute cities
       interests: getRandomInterests(),
+      photoUrl: photoFor(id),
     });
   }
 });

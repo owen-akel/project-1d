@@ -15,8 +15,49 @@ import * as Location from 'expo-location';
 import { getUsersByCity, ALL_USERS } from '../src/mock/users';
 import { useUser } from '../context/UserContext';
 import { useFriends } from '../context/FriendsContext';
+import { canViewUser, toMockCityName } from '../src/social/visibility';
+import { MAJOR_US_CITIES, findClosestCity } from '../src/data/cities';
+import useCityEvents from '../src/hooks/useCityEvents';
+import { eventCoordinate, personCoordinate } from '../src/social/placement';
+import { Button, BottomSheet, Chip, EventDetailsSheet } from '../src/ui';
+import { PersonMarker, EventMarker } from '../src/ui/MapMarkers';
 
 const { width, height } = Dimensions.get('window');
+
+const toYmd = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/** "Today", "Tomorrow", then weekday + date for the rest of the week. */
+function buildDayOptions(days) {
+  return Array.from({ length: days }, (_, offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+
+    let label;
+    if (offset === 0) label = 'Today';
+    else if (offset === 1) label = 'Tomorrow';
+    else label = date.toLocaleDateString([], { weekday: 'short', day: 'numeric' });
+
+    return { value: toYmd(date), label };
+  });
+}
+/** Label for a chosen day, matching the wording in the picker. */
+function dayLabel(value) {
+  const today = toYmd(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (value === today) return 'Today';
+  if (value === toYmd(tomorrow)) return 'Tomorrow';
+
+  const parsed = new Date(`${value}T00:00:00`);
+  return parsed.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 const DEFAULT_REGION = {
   latitude: 40.7128,
   longitude: -74.0060,
@@ -24,35 +65,8 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.0421,
 };
 
-// Helper to check if a user can be viewed
-function canViewUser(targetUserId, currentUserFriends) {
-  // Main users are only visible if they're in the friends list
-  if (targetUserId.startsWith('main-user-')) {
-    return currentUserFriends.includes(targetUserId);
-  }
-  
-  // Extract parent main user from friend ID (e.g., "rod-friend-5" -> "rod")
-  const parts = targetUserId.split('-');
-  if (parts.length >= 2 && parts[1] === 'friend') {
-    const firstName = parts[0];
-    const mainUserIndex = [
-      'rod', 'sam', 'clay', 'harry', 'john', 'pete',
-      'liam', 'warren', 'jackson', 'eric', 'simon', 'greg'
-    ].indexOf(firstName);
-    
-    if (mainUserIndex !== -1) {
-      const parentMainUserId = `main-user-${mainUserIndex + 1}`;
-      // Only visible if parent main user is in friends list
-      return currentUserFriends.includes(parentMainUserId);
-    }
-  }
-  
-  // Default: not visible
-  return false;
-}
-
 export default function MapScreen() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const navigation = useNavigation();
   const { user } = useUser();
   const { friends } = useFriends();
@@ -65,116 +79,75 @@ export default function MapScreen() {
   const [currentCityCoords, setCurrentCityCoords] = useState(null);
   const geocodeTimeoutRef = useRef(null);
 
-  // Major US cities with coordinates
-  const majorUSCities = [
-    { name: 'New York', lat: 40.7128, lng: -74.0060 },
-    { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
-    { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
-    { name: 'Houston', lat: 29.7604, lng: -95.3698 },
-    { name: 'Phoenix', lat: 33.4484, lng: -112.0740 },
-    { name: 'Philadelphia', lat: 39.9526, lng: -75.1652 },
-    { name: 'San Antonio', lat: 29.4241, lng: -98.4936 },
-    { name: 'San Diego', lat: 32.7157, lng: -117.1611 },
-    { name: 'Dallas', lat: 32.7767, lng: -96.7970 },
-    { name: 'San Jose', lat: 37.3382, lng: -121.8863 },
-    { name: 'Austin', lat: 30.2672, lng: -97.7431 },
-    { name: 'Jacksonville', lat: 30.3322, lng: -81.6557 },
-    { name: 'Fort Worth', lat: 32.7555, lng: -97.3308 },
-    { name: 'Columbus', lat: 39.9612, lng: -82.9988 },
-    { name: 'Charlotte', lat: 35.2271, lng: -80.8431 },
-    { name: 'San Francisco', lat: 37.7749, lng: -122.4194 },
-    { name: 'Indianapolis', lat: 39.7684, lng: -86.1581 },
-    { name: 'Seattle', lat: 47.6062, lng: -122.3321 },
-    { name: 'Denver', lat: 39.7392, lng: -104.9903 },
-    { name: 'Washington', lat: 38.9072, lng: -77.0369 },
-    { name: 'Boston', lat: 42.3601, lng: -71.0589 },
-    { name: 'El Paso', lat: 31.7619, lng: -106.4850 },
-    { name: 'Nashville', lat: 36.1627, lng: -86.7816 },
-    { name: 'Detroit', lat: 42.3314, lng: -83.0458 },
-    { name: 'Oklahoma City', lat: 35.4676, lng: -97.5164 },
-    { name: 'Portland', lat: 45.5152, lng: -122.6784 },
-    { name: 'Las Vegas', lat: 36.1699, lng: -115.1398 },
-    { name: 'Memphis', lat: 35.1495, lng: -90.0490 },
-    { name: 'Louisville', lat: 38.2527, lng: -85.7585 },
-    { name: 'Baltimore', lat: 39.2904, lng: -76.6122 },
-    { name: 'Milwaukee', lat: 43.0389, lng: -87.9065 },
-    { name: 'Albuquerque', lat: 35.0844, lng: -106.6504 },
-    { name: 'Tucson', lat: 32.2226, lng: -110.9747 },
-    { name: 'Fresno', lat: 36.7378, lng: -119.7871 },
-    { name: 'Sacramento', lat: 38.5816, lng: -121.4944 },
-    { name: 'Kansas City', lat: 39.0997, lng: -94.5786 },
-    { name: 'Mesa', lat: 33.4152, lng: -111.8315 },
-    { name: 'Atlanta', lat: 33.7490, lng: -84.3880 },
-    { name: 'Omaha', lat: 41.2565, lng: -95.9345 },
-    { name: 'Colorado Springs', lat: 38.8339, lng: -104.8214 },
-    { name: 'Raleigh', lat: 35.7796, lng: -78.6382 },
-    { name: 'Miami', lat: 25.7617, lng: -80.1918 },
-    { name: 'Virginia Beach', lat: 36.8529, lng: -75.9780 },
-    { name: 'Oakland', lat: 37.8044, lng: -122.2712 },
-    { name: 'Minneapolis', lat: 44.9778, lng: -93.2650 },
-    { name: 'Tulsa', lat: 36.1540, lng: -95.9928 },
-    { name: 'Cleveland', lat: 41.4993, lng: -81.6944 },
-    { name: 'Wichita', lat: 37.6872, lng: -97.3301 },
-    { name: 'Arlington', lat: 32.7357, lng: -97.1081 },
-    { name: 'Tampa', lat: 27.9506, lng: -82.4572 },
-    { name: 'New Orleans', lat: 29.9511, lng: -90.0715 },
-  ];
+  // Events for one day at a time, so the map stays readable.
+  const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
+  const [openEventId, setOpenEventId] = useState(null);
+  const [dateSheetOpen, setDateSheetOpen] = useState(false);
 
-  // Calculate distance between two coordinates (Haversine formula)
-  const calculateDistance = (lat1, lng1, lat2, lng2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
+  // Two independent toggles. Either, or both — but never neither, since an
+  // empty map tells you nothing.
+  const [showPeople, setShowPeople] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
 
-  // Map city names from majorUSCities to mock data city names
-  const mapCityNameToMockCity = (cityName) => {
-    const cityMap = {
-      'New York': 'NYC',
-      'Los Angeles': 'LA',
-      'Chicago': 'Chicago',
-      'San Francisco': 'SF',
-      'Boston': 'Boston',
-      'Austin': 'Austin',
-    };
-    return cityMap[cityName] || cityName;
-  };
-
-  // Find the closest major US city
-  const findClosestMajorCity = (latitude, longitude) => {
-    let closestCity = majorUSCities[0];
-    let minDistance = calculateDistance(latitude, longitude, closestCity.lat, closestCity.lng);
-
-    for (const city of majorUSCities) {
-      const distance = calculateDistance(latitude, longitude, city.lat, city.lng);
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestCity = city;
-      }
+  const toggleLayer = (layer) => {
+    if (layer === 'people') {
+      if (showPeople && !showEvents) return; // keep at least one on
+      setShowPeople((previous) => !previous);
+    } else {
+      if (showEvents && !showPeople) return;
+      setShowEvents((previous) => !previous);
     }
-
-    return closestCity;
   };
 
-  // Get users count in the current city (mapped to mock data city name)
-  // Only count visible users (friends + their friends)
+  const dayOptions = useMemo(() => buildDayOptions(7), []);
+
+  const { events: dayEvents } = useCityEvents({
+    city: currentCity !== 'Loading...' ? currentCity : null,
+    startDate: selectedDay,
+    endDate: selectedDay,
+    friends,
+  });
+
+  // Ticketmaster gives real venue coordinates; anything without them gets a
+  // stable invented spot near the city centre.
+  const mappedEvents = useMemo(
+    () =>
+      dayEvents
+        .map((event) => {
+          const { coordinate, precise } = eventCoordinate(event, currentCity);
+          return coordinate ? { ...event, coordinate, precise } : null;
+        })
+        .filter(Boolean),
+    [dayEvents, currentCity]
+  );
+
+  // People you can see in this city, placed around it like a Snap Map.
+  const mappedPeople = useMemo(() => {
+    if (!currentCity || currentCity === 'Loading...') return [];
+
+    return getUsersByCity(toMockCityName(currentCity))
+      .filter((cityUser) => canViewUser(cityUser.id, friends))
+      .map((cityUser) => {
+        const coordinate = personCoordinate(cityUser);
+        return coordinate ? { ...cityUser, coordinate } : null;
+      })
+      .filter(Boolean);
+  }, [currentCity, friends]);
+
+  const openEvent = useMemo(
+    () => mappedEvents.find((event) => event.id === openEventId) || null,
+    [mappedEvents, openEventId]
+  );
+
+  // Count only the people in this city the current user is allowed to see
+  // (friends + friends of friends).
   const currentCityUsersCount = useMemo(() => {
     if (!currentCity || currentCity === 'Loading...') {
       return 0;
     }
-    const mockCityName = mapCityNameToMockCity(currentCity);
-    const allUsersInCity = getUsersByCity(mockCityName);
-    // Filter to only show visible users (friends + their friends)
-    const visibleUsers = allUsersInCity.filter(user => canViewUser(user.id, friends));
-    return visibleUsers.length;
+    return getUsersByCity(toMockCityName(currentCity)).filter((cityUser) =>
+      canViewUser(cityUser.id, friends)
+    ).length;
   }, [currentCity, friends]);
 
 
@@ -191,7 +164,7 @@ export default function MapScreen() {
     // Debounce the geocoding to avoid too many API calls
     geocodeTimeoutRef.current = setTimeout(() => {
       // Find the closest major US city
-      const closestCity = findClosestMajorCity(regionToGeocode.latitude, regionToGeocode.longitude);
+      const closestCity = findClosestCity(regionToGeocode.latitude, regionToGeocode.longitude);
       setCurrentCity(closestCity.name);
       setCurrentCityCoords({
         latitude: closestCity.lat,
@@ -205,8 +178,7 @@ export default function MapScreen() {
   const centerOnResidence = useCallback((residenceCity) => {
     if (!residenceCity) return;
     
-    // Find the city in majorUSCities
-    const cityData = majorUSCities.find(city => city.name === residenceCity);
+    const cityData = MAJOR_US_CITIES.find((city) => city.name === residenceCity);
     if (cityData && mapRef.current) {
       const newRegion = {
         latitude: cityData.lat,
@@ -347,6 +319,8 @@ export default function MapScreen() {
         <MapView
           ref={mapRef}
           style={styles.map}
+          // Keep the map surface in step with the app's theme.
+          userInterfaceStyle={isDarkMode ? 'dark' : 'light'}
           region={region}
           onRegionChangeComplete={(newRegion) => {
             setRegion(newRegion);
@@ -370,7 +344,48 @@ export default function MapScreen() {
             />
           )}
 
+          {showPeople &&
+            mappedPeople.map((person) => (
+              <PersonMarker
+                key={`person-${person.id}`}
+                person={person}
+                onPress={() => navigation.navigate('FriendProfile', { userId: person.id })}
+              />
+            ))}
+
+          {showEvents &&
+            mappedEvents.map((event) => (
+              <EventMarker
+                key={`event-${event.id}`}
+                event={event}
+                onPress={() => setOpenEventId(event.id)}
+              />
+            ))}
         </MapView>
+
+        {/* Controls */}
+        <View style={styles.controls} pointerEvents="box-none">
+          <Button
+            label={`${dayLabel(selectedDay)}  ▾`}
+            variant="secondary"
+            size="sm"
+            onPress={() => setDateSheetOpen(true)}
+            style={[styles.dateButton, { backgroundColor: colors.card }]}
+          />
+
+          <View style={styles.layerToggles}>
+            <Chip
+              label={`People · ${mappedPeople.length}`}
+              selected={showPeople}
+              onPress={() => toggleLayer('people')}
+            />
+            <Chip
+              label={`Events · ${mappedEvents.length}`}
+              selected={showEvents}
+              onPress={() => toggleLayer('events')}
+            />
+          </View>
+        </View>
 
         {/* Zoom Controls */}
         <View style={[styles.zoomControls, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -414,17 +429,101 @@ export default function MapScreen() {
           >
             <Text style={[styles.floatingCityName, { color: colors.textPrimary }]}>{currentCity}</Text>
             <Text style={[styles.floatingCityConnections, { color: colors.primary }]}>
-              {currentCityUsersCount} Connections
+              {showPeople ? `${mappedPeople.length} connections` : ''}
+              {showPeople && showEvents ? ' · ' : ''}
+              {showEvents ? `${mappedEvents.length} events` : ''}
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
+      <BottomSheet
+        visible={dateSheetOpen}
+        onClose={() => setDateSheetOpen(false)}
+        title="Pick a day"
+        subtitle="Events happening on this date show on the map"
+      >
+        <ScrollView style={styles.dateSheet} contentContainerStyle={styles.dateSheetContent}>
+          {dayOptions.map((option) => {
+            const selected = option.value === selectedDay;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => {
+                  setSelectedDay(option.value);
+                  setDateSheetOpen(false);
+                }}
+                style={[
+                  styles.dateRow,
+                  { backgroundColor: selected ? colors.primaryMuted : 'transparent' },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dateRowText,
+                    {
+                      color: selected ? colors.primary : colors.textPrimary,
+                      fontWeight: selected ? '700' : '500',
+                    },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {selected ? (
+                  <Text style={[styles.dateRowText, { color: colors.primary }]}>✓</Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </BottomSheet>
+
+      <EventDetailsSheet
+        visible={Boolean(openEvent)}
+        onClose={() => setOpenEventId(null)}
+        event={openEvent}
+        countAttendees={(occurrence) =>
+          (occurrence?.attendeeIds || openEvent?.attendeeIds || []).length
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  controls: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    gap: 8,
+    zIndex: 5,
+  },
+  dateButton: {
+    alignSelf: 'flex-start',
+  },
+  layerToggles: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dateSheet: {
+    flexGrow: 0,
+  },
+  dateSheetContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  dateRowText: {
+    fontSize: 15,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -459,7 +558,8 @@ const styles = StyleSheet.create({
   zoomControls: {
     position: 'absolute',
     right: 20,
-    top: 20,
+    // Clears the date button and view toggle stacked above it.
+    top: 132,
     width: 50,
     borderRadius: 18,
     borderWidth: 1,
@@ -549,8 +649,10 @@ const styles = StyleSheet.create({
   },
   floatingCityButton: {
     position: 'absolute',
-    top: 20,
+    bottom: 20,
     left: 20,
+    right: 20,
+    alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingHorizontal: 12,
