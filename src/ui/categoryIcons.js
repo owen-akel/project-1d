@@ -1,16 +1,13 @@
 import React from 'react';
-import Svg, { Circle, Line, Path, Rect, Polyline, Ellipse } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Polygon } from 'react-native-svg';
 
 /**
- * Drawn icons for event categories — the job the emoji used to do, without
- * being stock Apple glyphs that ignore the palette and shift between platforms.
+ * Category icons for events.
  *
- * Ticketmaster collapses almost everything into a handful of segments, so
- * `type` alone puts most of a city's events on the same icon. `resolveCategory`
- * reads the genre first, which is where the useful detail lives (Musical, Rock,
- * Basketball, Film…), and only falls back to the broader segment.
- *
- * Everything is drawn on a 24x24 grid and kept simple enough to read at 18px.
+ * These live at 18–24px on map pins and event cards, which rules out fine line
+ * art — an earlier pass drew a theatre curtain as three thin strokes and it
+ * read as a "π". The rule here is one recognisable silhouette per icon, solid
+ * fills over outlines, and nothing that needs more than a glance.
  */
 
 const Frame = ({ size, children }) => (
@@ -19,7 +16,7 @@ const Frame = ({ size, children }) => (
   </Svg>
 );
 
-const line = (color, width = 1.8) => ({
+const bold = (color, width = 2) => ({
   stroke: color,
   strokeWidth: width,
   strokeLinecap: 'round',
@@ -29,66 +26,66 @@ const line = (color, width = 1.8) => ({
 
 /* ---------------------------------------------------------------- music --- */
 
+/** Music — a filled eighth note. */
 const MusicNote = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M10 18V5.5l8-1.6V16" {...line(c)} />
-    <Circle cx={7.6} cy={18.1} r={2.6} fill={c} />
-    <Circle cx={15.6} cy={16.5} r={2.6} fill={c} />
+    <Path d="M10.5 17V6l8-1.7v10.4" {...bold(c, 2)} />
+    <Circle cx={8} cy={17.4} r={3} fill={c} />
+    <Circle cx={16} cy={15.7} r={3} fill={c} />
   </Frame>
 );
 
+/**
+ * Gigs — headphones. A guitar pick was the first attempt and it read as a map
+ * pin once it sat inside a circular marker, which is the one thing it must not
+ * look like here.
+ */
+const Headphones = ({ c, s }) => (
+  <Frame size={s}>
+    <Path d="M4.4 15.2v-2.8a7.6 7.6 0 0 1 15.2 0v2.8" {...bold(c, 2.2)} />
+    <Rect x={2.6} y={13.6} width={4.6} height={7} rx={2.3} fill={c} />
+    <Rect x={16.8} y={13.6} width={4.6} height={7} rx={2.3} fill={c} />
+  </Frame>
+);
+
+/** Comedy — a mic. */
 const Microphone = ({ c, s }) => (
   <Frame size={s}>
-    <Rect x={9.4} y={2.8} width={5.2} height={10} rx={2.6} {...line(c)} />
-    <Path d="M6 11.2a6 6 0 0 0 12 0" {...line(c)} />
-    <Path d="M12 17.2V21M9 21h6" {...line(c)} />
-  </Frame>
-);
-
-const Guitar = ({ c, s }) => (
-  <Frame size={s}>
-    <Path d="M17.5 3.2 21 6.7l-2.6 2.2-2.9-2.9 2-2.8Z" {...line(c, 1.6)} />
-    <Path d="M15.5 6 10 11.5" {...line(c, 1.6)} />
-    <Ellipse cx={7.6} cy={15.4} rx={5.2} ry={4.6} {...line(c)} />
-    <Circle cx={7.6} cy={15.4} r={1.7} fill={c} />
+    <Rect x={9} y={2.6} width={6} height={10.4} rx={3} fill={c} />
+    <Path d="M5.6 11a6.4 6.4 0 0 0 12.8 0" {...bold(c)} />
+    <Path d="M12 17.4V21M8.6 21h6.8" {...bold(c)} />
   </Frame>
 );
 
 /* --------------------------------------------------------------- stage ---- */
 
-/** Theatre — the classic paired masks. */
-const Masks = ({ c, s }) => (
+/**
+ * Theatre — a single filled mask. Two overlapping outlined masks turned to
+ * mush at this size, so this is one shape with cut-out features.
+ */
+const Mask = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M3 5.5h8.5v5.2c0 2.9-1.9 5.2-4.25 5.2S3 13.6 3 10.7V5.5Z" {...line(c, 1.6)} />
-    <Path d="M12.5 8h8.5v5.2c0 2.9-1.9 5.2-4.25 5.2s-4.25-2.3-4.25-5.2V8Z" {...line(c, 1.6)} />
-    <Path d="M5.6 12.3c.9.8 2.1.8 3 0" {...line(c, 1.4)} />
-    <Path d="M15.1 13.6c.9.8 2.1.8 3 0" {...line(c, 1.4)} />
-  </Frame>
-);
-
-/** Play / drama — a curtained stage. */
-const Curtain = ({ c, s }) => (
-  <Frame size={s}>
-    <Path d="M3 4h18" {...line(c)} />
-    <Path d="M6 4c0 7-1 11-3 15M18 4c0 7 1 11 3 15" {...line(c, 1.6)} />
-    <Path d="M10 4c0 8-.6 12-1.6 15M14 4c0 8 .6 12 1.6 15" {...line(c, 1.4)} />
+    <Path d="M4 4.6h16v7.1c0 4.7-3.6 8.5-8 8.5s-8-3.8-8-8.5V4.6Z" fill={c} />
+    <Circle cx={9} cy={10.4} r={1.5} fill="#000" opacity={0.55} />
+    <Circle cx={15} cy={10.4} r={1.5} fill="#000" opacity={0.55} />
+    <Path d="M8.8 14.6c1.9 1.7 4.5 1.7 6.4 0" stroke="#000" strokeOpacity={0.55} strokeWidth={1.8} strokeLinecap="round" fill="none" />
   </Frame>
 );
 
 /** Dance — a figure mid-step. */
-const Dance = ({ c, s }) => (
+const Dancer = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={13.6} cy={4.6} r={2.1} fill={c} />
-    <Path d="M13.4 8.4 11 13l3.4 2.2L13 21" {...line(c)} />
-    <Path d="M11 13 6.4 15M14.4 15.2 19 12.4" {...line(c)} />
+    <Circle cx={14} cy={4.6} r={2.6} fill={c} />
+    <Path d="M13.8 8.2 11 13.2l3.6 2.4L13 21" {...bold(c, 2.1)} />
+    <Path d="M11 13.2 6 15.4M14.6 15.6 19.4 12.4" {...bold(c, 2.1)} />
   </Frame>
 );
 
-/** Family / children — a balloon. */
+/** Family — a balloon. */
 const Balloon = ({ c, s }) => (
   <Frame size={s}>
-    <Ellipse cx={12} cy={9} rx={5.6} ry={6.4} {...line(c)} />
-    <Path d="M12 15.4v1.8M12 17.2c0 1.6-1.6 1.6-1.6 3.2" {...line(c, 1.5)} />
+    <Path d="M12 2.6c3.4 0 6 2.9 6 6.4 0 3.6-3.4 6.6-6 6.6s-6-3-6-6.6c0-3.5 2.6-6.4 6-6.4Z" fill={c} />
+    <Path d="M12 15.6v1.6c0 1.8-1.8 1.6-1.8 3.4" {...bold(c, 1.8)} />
   </Frame>
 );
 
@@ -96,39 +93,38 @@ const Balloon = ({ c, s }) => (
 
 const Basketball = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={12} cy={12} r={8.2} {...line(c)} />
-    <Path d="M12 3.8v16.4M3.8 12h16.4" {...line(c, 1.4)} />
-    <Path d="M6.2 6.2c3.4 3.4 3.4 8.2 0 11.6M17.8 6.2c-3.4 3.4-3.4 8.2 0 11.6" {...line(c, 1.4)} />
+    <Circle cx={12} cy={12} r={8.4} {...bold(c, 2)} />
+    <Path d="M12 3.6v16.8M3.6 12h16.8" {...bold(c, 1.6)} />
+    <Path d="M6.4 6.4c3.2 3.2 3.2 8 0 11.2M17.6 6.4c-3.2 3.2-3.2 8 0 11.2" {...bold(c, 1.6)} />
   </Frame>
 );
 
 const Baseball = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={12} cy={12} r={8.2} {...line(c)} />
-    <Path d="M6.6 6.2c2 2.4 2 9.2 0 11.6M17.4 6.2c-2 2.4-2 9.2 0 11.6" {...line(c, 1.4)} />
+    <Circle cx={12} cy={12} r={8.4} {...bold(c, 2)} />
+    <Path d="M6.8 6.2c2.2 2.6 2.2 9 0 11.6M17.2 6.2c-2.2 2.6-2.2 9 0 11.6" {...bold(c, 1.7)} />
   </Frame>
 );
 
 const Soccer = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={12} cy={12} r={8.2} {...line(c)} />
-    <Path d="m12 7.4 3.6 2.6-1.4 4.3h-4.4L8.4 10 12 7.4Z" {...line(c, 1.4)} />
-    <Path d="M12 3.8v3.6M4.4 9.6 8.4 10M19.6 9.6 15.6 10M7.6 19l2.2-4.7M16.4 19l-2.2-4.7" {...line(c, 1.2)} />
+    <Circle cx={12} cy={12} r={8.4} {...bold(c, 2)} />
+    <Polygon points="12,7 15.8,9.8 14.4,14.2 9.6,14.2 8.2,9.8" fill={c} />
   </Frame>
 );
 
 const Hockey = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M5 4.5 13.5 16h4.8" {...line(c)} />
-    <Ellipse cx={18.4} cy={18.4} rx={3.4} ry={1.9} {...line(c)} />
+    <Path d="M4.6 3.8 13.6 16h4.2" {...bold(c, 2.2)} />
+    <Rect x={14.8} y={16.6} width={7} height={3.8} rx={1.9} fill={c} />
   </Frame>
 );
 
-/** Generic sport — a ball with seams. */
+/** Generic sport. */
 const Ball = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={12} cy={12} r={8.2} {...line(c)} />
-    <Path d="M4.4 9.4c4.4 1.6 10.8 1.6 15.2 0M4.4 14.6c4.4-1.6 10.8-1.6 15.2 0" {...line(c, 1.4)} />
+    <Circle cx={12} cy={12} r={8.4} {...bold(c, 2)} />
+    <Path d="M4.2 9.2c4.6 1.8 11 1.8 15.6 0M4.2 14.8c4.6-1.8 11-1.8 15.6 0" {...bold(c, 1.6)} />
   </Frame>
 );
 
@@ -136,93 +132,95 @@ const Ball = ({ c, s }) => (
 
 const Clapperboard = ({ c, s }) => (
   <Frame size={s}>
-    <Rect x={3} y={9.4} width={18} height={10.6} rx={2} {...line(c)} />
-    <Path d="M3.6 9.4 6 4.6l17.4 1.2-.6 3.6" {...line(c, 1.5)} />
-    <Path d="m9.4 4.9-1.6 4.3M14.8 5.3l-1.6 4.1" {...line(c, 1.4)} />
+    <Rect x={3} y={10} width={18} height={10} rx={2} fill={c} />
+    <Path d="M3.4 9.6 5.6 5l16.6 1.4-.5 3.2H3.4Z" fill={c} />
+    <Path d="m10 5.4-1.4 4M15.4 5.9 14 9.6" stroke="#000" strokeOpacity={0.5} strokeWidth={1.6} strokeLinecap="round" />
   </Frame>
 );
 
 const Palette = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M12 3.6c4.9 0 8.6 3.4 8.6 7.6 0 2.6-2 3.7-3.6 3.7h-1.6c-1.2 0-2 .8-2 1.8 0 .5.2.9.4 1.3.3.4.4.8.4 1.2 0 1-.9 1.6-2.2 1.6-4.8 0-8.6-3.8-8.6-8.6S7.2 3.6 12 3.6Z" {...line(c, 1.6)} />
-    <Circle cx={8.4} cy={9.4} r={1.2} fill={c} />
-    <Circle cx={12.6} cy={7.6} r={1.2} fill={c} />
-    <Circle cx={16.4} cy={9.8} r={1.2} fill={c} />
+    <Path d="M12 3.4c5 0 8.8 3.4 8.8 7.8 0 2.6-2.1 3.8-3.7 3.8h-1.6c-1.2 0-2 .8-2 1.8 0 .5.2.9.4 1.3.2.3.3.7.3 1 0 1-.9 1.5-2.2 1.5-4.9 0-8.8-3.9-8.8-8.8S7.1 3.4 12 3.4Z" {...bold(c, 2)} />
+    <Circle cx={8.4} cy={9.6} r={1.5} fill={c} />
+    <Circle cx={12.6} cy={7.6} r={1.5} fill={c} />
+    <Circle cx={16.4} cy={10} r={1.5} fill={c} />
   </Frame>
 );
 
 const Cutlery = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M7 3.4v6.2M4.8 3.4v3.4c0 1.2.9 2.2 2.2 2.2s2.2-1 2.2-2.2V3.4M7 9.6V20.6" {...line(c, 1.6)} />
-    <Path d="M16.6 20.6v-7.4c-1.5 0-2.6-1-2.6-2.6 0-3 1.6-6.6 3.6-6.6s3.6 3.6 3.6 6.6c0 1.6-1 2.6-2.6 2.6v7.4" {...line(c, 1.6)} />
+    <Path d="M6.8 3v6.4M4.4 3v3.6c0 1.4 1 2.4 2.4 2.4s2.4-1 2.4-2.4V3M6.8 9.4V21" {...bold(c, 2)} />
+    <Path d="M16.8 21v-7.6c-1.6 0-2.8-1.1-2.8-2.8 0-3.2 1.7-7 3.8-7s3.8 3.8 3.8 7c0 1.7-1.2 2.8-2.8 2.8V21" {...bold(c, 2)} />
   </Frame>
 );
 
 const Glass = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M6 4h12l-6 7.4L6 4Z" {...line(c)} />
-    <Path d="M12 11.4V20M8.6 20h6.8" {...line(c)} />
+    <Path d="M5.2 4h13.6L12 12 5.2 4Z" fill={c} />
+    <Path d="M12 12v8M8.2 20h7.6" {...bold(c, 2)} />
   </Frame>
 );
 
 const GolfFlag = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M8.4 19.6V3.6l8.4 3.4-8.4 3.4" {...line(c)} />
-    <Path d="M4.6 19.8c2 1 12.8 1 14.8 0" {...line(c, 1.5)} />
+    <Path d="M8.4 3.4v17" {...bold(c, 2.2)} />
+    <Path d="M8.4 3.8 17.6 7l-9.2 3.2V3.8Z" fill={c} />
+    <Path d="M4.4 20.4c2.2 1.1 13 1.1 15.2 0" {...bold(c, 1.8)} />
   </Frame>
 );
 
 const Barbell = ({ c, s }) => (
   <Frame size={s}>
-    <Line x1={7} y1={12} x2={17} y2={12} {...line(c, 2.2)} />
-    <Rect x={3.2} y={8} width={3.4} height={8} rx={1.3} {...line(c)} />
-    <Rect x={17.4} y={8} width={3.4} height={8} rx={1.3} {...line(c)} />
+    <Line x1={7} y1={12} x2={17} y2={12} {...bold(c, 2.4)} />
+    <Rect x={2.8} y={7.4} width={4} height={9.2} rx={1.6} fill={c} />
+    <Rect x={17.2} y={7.4} width={4} height={9.2} rx={1.6} fill={c} />
   </Frame>
 );
 
 const Runner = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={14.8} cy={4.8} r={2.2} fill={c} />
-    <Path d="M6.4 20.4 10 15.4l2.2-2.8 1.8 3.4L16.6 20.4" {...line(c)} />
-    <Path d="m10.2 11 4.2-1.8 3.4 2.2 2.6-.4" {...line(c)} />
+    <Circle cx={15} cy={4.6} r={2.6} fill={c} />
+    <Path d="M6 20.6 9.8 15.2l2.4-3 1.9 3.6L16.8 20.6" {...bold(c, 2.1)} />
+    <Path d="m10.2 10.8 4.4-2 3.5 2.3 2.5-.4" {...bold(c, 2.1)} />
   </Frame>
 );
 
 const Mountains = ({ c, s }) => (
   <Frame size={s}>
-    <Polyline points="2.6,19 9,8 13.4,15.2 15.6,11.4 21.4,19" {...line(c)} />
-    <Circle cx={17.6} cy={6} r={2} fill={c} />
+    <Path d="M2.2 19.4 9 7.6l4.4 7.4L15.6 11l6.2 8.4H2.2Z" fill={c} />
+    <Circle cx={17.8} cy={5.6} r={2.2} fill={c} />
   </Frame>
 );
 
 const Book = ({ c, s }) => (
   <Frame size={s}>
-    <Path d="M12 6.6C10.2 5.2 7.8 4.7 4.6 5v12.6c3.2-.3 5.6.2 7.4 1.6 1.8-1.4 4.2-1.9 7.4-1.6V5c-3.2-.3-5.6.2-7.4 1.6Z" {...line(c)} />
-    <Line x1={12} y1={6.6} x2={12} y2={19.2} {...line(c, 1.4)} />
+    <Path d="M12 6.6C10.1 5.1 7.6 4.6 4.4 4.9v12.8c3.2-.3 5.7.2 7.6 1.7 1.9-1.5 4.4-2 7.6-1.7V4.9c-3.2-.3-5.7.2-7.6 1.7Z" {...bold(c, 2)} />
+    <Line x1={12} y1={6.6} x2={12} y2={19.4} {...bold(c, 1.7)} />
   </Frame>
 );
 
 const People = ({ c, s }) => (
   <Frame size={s}>
-    <Circle cx={12} cy={7} r={2.8} {...line(c)} />
-    <Circle cx={5} cy={14.4} r={2.2} {...line(c)} />
-    <Circle cx={19} cy={14.4} r={2.2} {...line(c)} />
-    <Path d="M8.4 19.6c.9-1.9 2.1-2.8 3.6-2.8s2.7.9 3.6 2.8" {...line(c, 1.5)} />
+    <Circle cx={12} cy={6.6} r={3} fill={c} />
+    <Circle cx={4.8} cy={13.6} r={2.4} fill={c} />
+    <Circle cx={19.2} cy={13.6} r={2.4} fill={c} />
+    <Path d="M7.4 20c1.1-2.4 2.7-3.6 4.6-3.6s3.5 1.2 4.6 3.6" {...bold(c, 2)} />
   </Frame>
 );
 
 const Camera = ({ c, s }) => (
   <Frame size={s}>
-    <Rect x={2.8} y={6.8} width={18.4} height={13} rx={2.6} {...line(c)} />
-    <Path d="M8.6 6.8 10 4.2h4l1.4 2.6" {...line(c)} />
-    <Circle cx={12} cy={13.4} r={3.6} {...line(c)} />
+    <Rect x={2.6} y={6.6} width={18.8} height={13.4} rx={2.8} {...bold(c, 2)} />
+    <Path d="M8.4 6.6 9.8 3.8h4.4l1.4 2.8" {...bold(c, 2)} />
+    <Circle cx={12} cy={13.4} r={3.8} fill={c} />
   </Frame>
 );
 
-const CalendarIcon = ({ c, s }) => (
+/** Fallback — a ticket, which at least says "event". */
+const Ticket = ({ c, s }) => (
   <Frame size={s}>
-    <Rect x={3.4} y={5.4} width={17.2} height={14.4} rx={2.6} {...line(c)} />
-    <Path d="M3.4 10.2h17.2M8.4 3.4v3.6M15.6 3.4v3.6" {...line(c)} />
+    <Path d="M3.4 6.6h17.2v3.2a2.2 2.2 0 0 0 0 4.4v3.2H3.4v-3.2a2.2 2.2 0 0 0 0-4.4V6.6Z" {...bold(c, 2)} />
+    <Path d="M13.6 8.6v6.8" stroke={c} strokeWidth={1.8} strokeLinecap="round" strokeDasharray="2 2.4" />
   </Frame>
 );
 
@@ -230,11 +228,10 @@ const CalendarIcon = ({ c, s }) => (
 
 const DRAWINGS = {
   music: MusicNote,
-  rock: Guitar,
+  gig: Headphones,
   standup: Microphone,
-  theatre: Masks,
-  play: Curtain,
-  dance: Dance,
+  stage: Mask,
+  dance: Dancer,
   family: Balloon,
   basketball: Basketball,
   baseball: Baseball,
@@ -252,20 +249,19 @@ const DRAWINGS = {
   academic: Book,
   social: People,
   creative: Camera,
-  default: CalendarIcon,
+  default: Ticket,
 };
 
-// Genre wins over segment: Ticketmaster files nearly every NY listing under
-// "Arts & Theatre", so the segment alone would give a whole city one icon.
+// Genre wins over segment: Ticketmaster files nearly every listing in a city
+// under one or two segments, so the segment alone gives a whole map one icon.
 const GENRE_RULES = [
-  [/rock|pop|metal|indie|alternative|hip.?hop|rap|country|jazz|blues|r&b|electronic|dance music/i, 'rock'],
-  [/classical|opera|orchestra/i, 'music'],
+  [/rock|pop|metal|indie|alternative|hip.?hop|rap|country|punk|folk|r&b|electronic|dance music/i, 'gig'],
+  [/classical|opera|orchestra|symphony|jazz|blues/i, 'music'],
   [/comedy|stand.?up/i, 'standup'],
-  // Before the theatre rules: "Children's Theatre" is family, not drama.
+  // Ahead of the stage rules: "Children's Theatre" is family, not drama.
   [/children|family|puppet/i, 'family'],
-  [/musical/i, 'theatre'],
   [/dance|ballet/i, 'dance'],
-  [/theat|play|drama/i, 'play'],
+  [/musical|theat|play|drama|broadway/i, 'stage'],
   [/basketball/i, 'basketball'],
   [/baseball/i, 'baseball'],
   [/soccer|football/i, 'soccer'],
@@ -276,16 +272,18 @@ const GENRE_RULES = [
   [/beer|wine|spirits|brew/i, 'drinks'],
   [/golf/i, 'golf'],
   [/running|marathon|race/i, 'running'],
+  [/sport|athletic/i, 'sports'],
+  [/music|concert/i, 'music'],
 ];
 
 const TYPE_ALIASES = {
   music: 'music',
-  'music-festival': 'music',
-  concerts: 'music',
+  'music-festival': 'gig',
+  concerts: 'gig',
   comedy: 'standup',
-  theater: 'theatre',
-  theatre: 'theatre',
-  festivals: 'theatre',
+  theater: 'stage',
+  theatre: 'stage',
+  festivals: 'stage',
   sports: 'sports',
   golf: 'golf',
   lifting: 'lifting',
@@ -307,7 +305,7 @@ export function resolveCategory(event) {
   if (!event) return 'default';
 
   // Genre on its own first. Matching genre and segment together would let
-  // "Arts & Theatre" swallow everything filed under it — a Dance or Fine Art
+  // "Arts & Theatre" swallow everything filed under it, so a Dance or Fine Art
   // listing would come back as drama.
   const byGenre = GENRE_RULES.find(([pattern]) => pattern.test(event.genre || ''));
   if (byGenre) return byGenre[1];
